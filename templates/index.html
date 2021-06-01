@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+   <title>Home</title>
+</head>
+
+<body>
+   <head>
+      <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.10.23/css/jquery.dataTables.css">
+      <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/buttons/1.6.5/css/buttons.dataTables.min.css">
+      <script type="text/javascript" charset="utf8" src="https://code.jquery.com/jquery-3.5.1.js"></script>
+      <script type="text/javascript" charset="utf8" src="https://cdn.datatables.net/1.10.23/js/jquery.dataTables.min.js"></script>
+      <script>
+         $(document).ready(function () {
+            var image = function (data, type, row) {
+               return '<img src="https://securea.mlb.com/mlb/images/players/head_shot/' + data + '.jpg" width="40"/>'
+            }
+            var percentFunc = function (data, type, row) {
+               return (data * 100).toFixed(2).toString() + '%';
+            }
+            var roundFunc = function (data, type, row) {
+               if (data === '') {
+                  return data;
+               } else {
+                  return data.toFixed(2).toString();
+               }
+            }
+            $('table.display').DataTable({
+               ajax: {
+                  url: '/loadTableData',
+                  dataSrc: ''
+               },
+               columns: [
+                  {
+                     data: 'player_name',
+                     title: 'Name'
+                  }, {
+                     data: 'team',
+                     title: 'Team'
+                  }, {
+                     data: 'batter_handedness',
+                     title: 'B'
+                  }, {
+                     data: 'G_total',
+                     title: 'G'
+                  }, {
+                     data: 'H_total',
+                     title: 'H'
+                  }, {
+                     data: 'hit_pct_total',
+                     title: '% of Games w/ Hit',
+                     render: percentFunc
+                  }, {
+                     data: 'x_hit_pct_total',
+                     title: 'Expected % of Games w/ Hit',
+                     render: percentFunc
+                  }, {
+                     data: 'G_10',
+                     title: 'G (last 10 days)'
+                  }, {
+                     data: 'H_10',
+                     title: 'H (last 10 days)'
+                  }, {
+                     data: 'hit_pct_10',
+                     title: '% of Games w/ Hit (last 10 days)',
+                     render: percentFunc
+                  }, {
+                     data: 'x_hit_pct_10',
+                     title: 'Expected % of Games w/ Hit (last 10 days)',
+                     render: percentFunc
+                  }, {
+                     data: 'opponent',
+                     title: 'Opponent'
+                  }, {
+                     data: 'pitcher_name',
+                     title: 'Probable Opposing Starter'
+                  }, {
+                     data: 's_avg_BF',
+                     title: 'Starter: Avg. Batters Faced',
+                     render: roundFunc
+                  }, {
+                     data: 's_std_BF',
+                     title: 'Starter: Std. Dev. Batters Faced',
+                     render: roundFunc
+                  }, {
+                     data: 's_avg_xHA_per_BF',
+                     title: 'Starter: Avg. xHA per Batter Faced',
+                     render: roundFunc
+                  }, {
+                     data: 's_std_xHA_per_BF',
+                     title: 'Starter: Std. Dev. xHA per Batter Faced',
+                     render: roundFunc
+                  }, {
+                     data: 'bp_avg_xHA_per_BF',
+                     title: 'Bullpen: Avg. xHA per Batter Faced',
+                     render: roundFunc
+                  }, {
+                     data: 'bp_std_xHA_per_BF',
+                     title: 'Bullpen: Std. Dev. xHA per Batter Faced',
+                     render: roundFunc
+                  }
+               ]
+            })
+         });
+      </script>
+   </head>
+   <table class="display"></table>
+</body>
+
+</html>

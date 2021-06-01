@@ -36,7 +36,7 @@ def index():
 
     pd.set_option('expand_frame_repr', False)
     print('\n', 'Season and Recent expected Hit-Game % >= 50%:', '\n', '\n', all_df[(all_df['x_hit_pct_total'] >= 0.5) & (all_df['x_hit_pct_{}'.format(last_x_days)] >= 0.5)], sep='')
-    out_dict = all_df.fillna('').to_dict(orient='rows')
+    out_dict = all_df.fillna('').to_dict('records')
     return jsonify(out_dict)
 
 

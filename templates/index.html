@@ -23,7 +23,7 @@
                if (data === '') {
                   return data;
                } else {
-                  return data.toFixed(2).toString();
+                  return data.toFixed(3).toString();
                }
             }
             $('table.display').DataTable({
@@ -100,7 +100,8 @@
                      title: 'Bullpen: Std. Dev. xHA per Batter Faced',
                      render: roundFunc
                   }
-               ]
+               ],
+               order: [[ 6, 'desc']]
             })
          });
       </script>

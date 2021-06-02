@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, render_template, send_from_directory
+from flask import Flask, jsonify, render_template, request
 import pandas as pd
 import numpy as np
 import requests
@@ -24,7 +24,7 @@ def index():
 
     general_info_df = statcast_df.drop_duplicates(subset='batter', keep='last').rename({'batter': 'player_id'}, axis=1)[['player_id', 'team', 'batter_handedness']]
     calculations_df = calculate_hit_pct(statcast_df)
-    last_x_days = 10
+    last_x_days = int(request.args.get('days'))
     x_days_ago = today - datetime.timedelta(days=last_x_days + 1)
     calculations_df_x_days = calculate_hit_pct(statcast_df, since_date=x_days_ago.strftime('%Y-%m-%d'))
     calculations_df_x_days.drop('player_name', axis=1, inplace=True)
@@ -32,7 +32,7 @@ def index():
     calculations_df = pd.merge(general_info_df, calculations_df, how='right', on='player_id')
     all_df = pd.merge(calculations_df, calculations_df_x_days, how='left', on='player_id', suffixes=('_total', f'_{last_x_days}'))
     all_df = pd.merge(all_df, get_opponent_info(statcast_df, today), how='left', left_on='team', right_on='opponent').drop(['game_number', 'opponent'], axis=1).rename({'pitching_team': 'opponent'}, axis=1)
-    all_df = all_df[all_df['G_total'] >= 10]
+    all_df['player_name'] = all_df['player_name'].apply(lambda name: ' '.join(name.split(',')[::-1]).strip())
 
     pd.set_option('expand_frame_repr', False)
     print('\n', 'Season and Recent expected Hit-Game % >= 50%:', '\n', '\n', all_df[(all_df['x_hit_pct_total'] >= 0.5) & (all_df['x_hit_pct_{}'.format(last_x_days)] >= 0.5)], sep='')
@@ -182,7 +182,7 @@ def get_opponent_info(statcast_df, today):
             if 'probablePitcher' in team.keys():
                 pitcher_id = team['probablePitcher']['id']
                 matchup_dict['pitcher_id'] = pitcher_id
-                matchup_dict['pitcher_name'] = team['probablePitcher']['lastFirstName']
+                matchup_dict['pitcher_name'] = team['probablePitcher']['firstLastName']
                 matchup_dict['s_avg_BF'], matchup_dict['s_std_BF'], matchup_dict['s_avg_xHA_per_BF'], matchup_dict['s_std_xHA_per_BF'] = get_pitcher_stats(statcast_df[(statcast_df['pitcher'] == pitcher_id) & (statcast_df['starter_flg'] == True)])
             matchup_dict['bp_avg_xHA_per_BF'], matchup_dict['bp_std_xHA_per_BF'] = get_pitcher_stats(statcast_df[(statcast_df['opponent'] == team_abbreviation) & (statcast_df['starter_flg'] == False)], bullpen=True)
             matchups.append(matchup_dict)

@@ -17,18 +17,23 @@
                return '<img src="https://securea.mlb.com/mlb/images/players/head_shot/' + data + '.jpg" width="40"/>'
             }
             var percentFunc = function (data, type, row) {
-               return (data * 100).toFixed(2).toString() + '%';
+               if (data === '') {
+                  return data;
+               } else {
+                  return (data * 100).toFixed(2).toString() + '%';
+               }
             }
             var roundFunc = function (data, type, row) {
                if (data === '') {
                   return data;
                } else {
-                  return data.toFixed(3).toString();
+                  return data.toFixed(2).toString();
                }
             }
+            var last_x_days = 7;
             $('table.display').DataTable({
                ajax: {
-                  url: '/loadTableData',
+                  url: '/loadTableData?days=' + last_x_days,
                   dataSrc: ''
                },
                columns: [
@@ -56,18 +61,18 @@
                      title: 'Expected % of Games w/ Hit',
                      render: percentFunc
                   }, {
-                     data: 'G_10',
-                     title: 'G (last 10 days)'
+                     data: 'G_' + last_x_days,
+                     title: 'G (last ' + last_x_days + ' days)'
                   }, {
-                     data: 'H_10',
-                     title: 'H (last 10 days)'
+                     data: 'H_' + last_x_days,
+                     title: 'H (last ' + last_x_days + ' days)'
                   }, {
-                     data: 'hit_pct_10',
-                     title: '% of Games w/ Hit (last 10 days)',
+                     data: 'hit_pct_' + last_x_days,
+                     title: '% of Games w/ Hit (last ' + last_x_days + ' days)',
                      render: percentFunc
                   }, {
-                     data: 'x_hit_pct_10',
-                     title: 'Expected % of Games w/ Hit (last 10 days)',
+                     data: 'x_hit_pct_' + last_x_days,
+                     title: 'Expected % of Games w/ Hit (last ' + last_x_days + ' days)',
                      render: percentFunc
                   }, {
                      data: 'opponent',
@@ -75,14 +80,6 @@
                   }, {
                      data: 'pitcher_name',
                      title: 'Probable Opposing Starter'
-                  }, {
-                     data: 's_avg_BF',
-                     title: 'Starter: Avg. Batters Faced',
-                     render: roundFunc
-                  }, {
-                     data: 's_std_BF',
-                     title: 'Starter: Std. Dev. Batters Faced',
-                     render: roundFunc
                   }, {
                      data: 's_avg_xHA_per_BF',
                      title: 'Starter: Avg. xHA per Batter Faced',
@@ -101,7 +98,7 @@
                      render: roundFunc
                   }
                ],
-               order: [[ 6, 'desc']]
+               order: [[ 8, 'desc']]
             })
          });
       </script>

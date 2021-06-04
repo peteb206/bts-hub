@@ -7,6 +7,7 @@ import os
 import sys
 import datetime
 import time
+import pymongo
 
 
 app = Flask(__name__)
@@ -44,19 +45,23 @@ def get_statcast_data(today):
     # Start timer
     start_time = time.time()
 
+    client = pymongo.MongoClient(os.environ.get('DATABASE_CLIENT'))
+    database = client[os.environ.get('DATABASE_NAME')]
+    collection = database[os.environ.get('DATABASE_COLLECTION')]
+
     this_year = today.year
-    csv_name = 'statcast_{}.csv'.format(this_year)
 
     start_date = datetime.date(this_year, 1, 1)
     savant_scrape_days_span = 9
     savant_scrape_date_offset_minus_1, savant_scrape_date_offset = datetime.timedelta(days=savant_scrape_days_span - 1), datetime.timedelta(days=savant_scrape_days_span)
 
     df_list = list()
-    existing_data_df = pd.read_csv(csv_name) if os.path.isfile(csv_name) else pd.DataFrame()
+    existing_data_df = pd.DataFrame(collection.find())
+
     if len(existing_data_df.index) > 0:
         df_list.append(existing_data_df)
         last_date = existing_data_df['game_date'].values[-1]
-        print(f'{csv_name} has data up to {last_date}', '\n', sep='')
+        print(f'bts_advisor database has data up to {last_date}', '\n', sep='')
         last_date_split = last_date.split('-')
         start_date = datetime.date(this_year, int(last_date_split[1]), int(last_date_split[2])) + datetime.timedelta(days=1)
 
@@ -124,7 +129,8 @@ def get_statcast_data(today):
             df['starter_flg'] = np.where(df['starter_flg'] == 'both', True, False)
             df.rename({'estimated_ba_using_speedangle': 'xBA', 'stand': 'batter_handedness', 'p_throws': 'pitcher_handedness'}, axis=1, inplace=True)
             df['xBA'].fillna(0, inplace=True)
-            df = df[['game_date', 'game_pk', 'player_name', 'team', 'opponent', 'batter', 'batter_handedness', 'pitcher', 'pitcher_handedness', 'starter_flg', 'events', 'home_away', 'hit', 'xBA']]
+            df['_id'] = df['game_pk'].astype(str) + '_' + df['at_bat_number'].astype(str)
+            df = df[['_id', 'game_date', 'game_pk', 'player_name', 'team', 'opponent', 'batter', 'batter_handedness', 'pitcher', 'pitcher_handedness', 'starter_flg', 'events', 'home_away', 'hit', 'xBA']]
             df_list.append(df)
 
         start_date += savant_scrape_date_offset
@@ -136,7 +142,9 @@ def get_statcast_data(today):
     no_statcast_games = temp_df[temp_df['xBA'] == 0]['game_pk'].tolist()
     df['statcast'] = ~df['game_pk'].isin(no_statcast_games)
 
-    df.to_csv(csv_name, index=False)
+    out_dict = pd.concat([existing_data_df, df], ignore_index=True).drop_duplicates(subset='_id', keep=False).to_dict('records') # drop duplicate events
+    if len(out_dict) > 0: 
+        collection.insert_many(out_dict)
 
     # Stop timer
     print('\n', 'Done retrieving statcast data!', '\n', '\n', '--- Total time: {} minutes ---'.format(str(round((time.time() - start_time) / 60, 2))), sep='')

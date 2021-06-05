@@ -9,8 +9,10 @@
    <head>
       <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.10.23/css/jquery.dataTables.css">
       <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/buttons/1.6.5/css/buttons.dataTables.min.css">
+      <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/fixedcolumns/3.3.3/css/fixedColumns.dataTables.min.css">
       <script type="text/javascript" charset="utf8" src="https://code.jquery.com/jquery-3.5.1.js"></script>
       <script type="text/javascript" charset="utf8" src="https://cdn.datatables.net/1.10.23/js/jquery.dataTables.min.js"></script>
+      <script type="text/javascript" charset="utf8" src="https://cdn.datatables.net/fixedcolumns/3.3.3/js/dataTables.fixedColumns.min.js"></script>
       <script>
          $(document).ready(function () {
             var image = function (data, type, row) {
@@ -47,11 +49,12 @@
                      data: 'batter_handedness',
                      title: 'B'
                   }, {
-                     data: 'G_total',
-                     title: 'G'
-                  }, {
                      data: 'H_total',
                      title: 'H'
+                  }, {
+                     data: 'xH_per_G_total',
+                     title: 'xH per Game',
+                     render: roundFunc
                   }, {
                      data: 'hit_pct_total',
                      title: '% of Games w/ Hit',
@@ -61,11 +64,12 @@
                      title: 'Expected % of Games w/ Hit',
                      render: percentFunc
                   }, {
-                     data: 'G_' + last_x_days,
-                     title: 'G (last ' + last_x_days + ' days)'
-                  }, {
                      data: 'H_' + last_x_days,
                      title: 'H (last ' + last_x_days + ' days)'
+                  }, {
+                     data: 'xH_per_G_' + last_x_days,
+                     title: 'xH per Game (last ' + last_x_days + ' days)',
+                     render: roundFunc
                   }, {
                      data: 'hit_pct_' + last_x_days,
                      title: '% of Games w/ Hit (last ' + last_x_days + ' days)',
@@ -81,24 +85,21 @@
                      data: 'pitcher_name',
                      title: 'Probable Opposing Starter'
                   }, {
-                     data: 's_avg_xHA_per_BF',
-                     title: 'Starter: Avg. xHA per Batter Faced',
-                     render: roundFunc
+                     data: 'sp_xHA_per_BF_interval',
+                     title: 'Starter: xHA per Batter (Q1, Q2, Q3)'
                   }, {
-                     data: 's_std_xHA_per_BF',
-                     title: 'Starter: Std. Dev. xHA per Batter Faced',
-                     render: roundFunc
-                  }, {
-                     data: 'bp_avg_xHA_per_BF',
-                     title: 'Bullpen: Avg. xHA per Batter Faced',
-                     render: roundFunc
-                  }, {
-                     data: 'bp_std_xHA_per_BF',
-                     title: 'Bullpen: Std. Dev. xHA per Batter Faced',
-                     render: roundFunc
+                     data: 'bp_xHA_per_BF_interval',
+                     title: 'Bullpen: xHA per Batter (Q1, Q2, Q3)'
                   }
                ],
-               order: [[ 8, 'desc']]
+               order: [[ 3, 'desc']],
+               scrollX: true,
+               paging: false,
+               scrollY: '75vh',
+               scrollCollapse: true,
+               fixedColumns: {
+                  leftColumns: 3
+               }
             })
          });
       </script>

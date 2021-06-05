@@ -164,10 +164,10 @@ def calculate_hit_pct(statcast_df, since_date=None):
     df_by_game['player_id'] = df_by_game['batter']
     keep_cols = ['player_id'] + keep_cols
 
-    df_by_season = df_by_game.groupby(keep_cols).agg({'H': 'sum', 'G': 'sum', 'H_1+': 'sum', 'xH_1+': 'sum', 'statcast_G': 'sum'}).reset_index().rename({'batter': 'G'}, axis=1)
+    df_by_season = df_by_game.groupby(keep_cols).agg({'H': 'sum', 'xH': 'mean', 'G': 'sum', 'H_1+': 'sum', 'xH_1+': 'sum', 'statcast_G': 'sum'}).reset_index().rename({'batter': 'G', 'xH': 'xH_per_G'}, axis=1)
     df_by_season['hit_pct'] = df_by_season['H_1+'] / df_by_season['G']
     df_by_season['x_hit_pct'] = df_by_season['xH_1+'] / df_by_season['statcast_G']
-    return df_by_season.drop(['H_1+', 'xH_1+', 'statcast_G'], axis=1).sort_values(by='x_hit_pct', ascending=False, ignore_index=True)
+    return df_by_season.drop(['H_1+', 'xH_1+', 'statcast_G'], axis=1)
 
 
 def get_opponent_info(statcast_df, today):
@@ -191,22 +191,23 @@ def get_opponent_info(statcast_df, today):
                 pitcher_id = team['probablePitcher']['id']
                 matchup_dict['pitcher_id'] = pitcher_id
                 matchup_dict['pitcher_name'] = team['probablePitcher']['firstLastName']
-                matchup_dict['s_avg_BF'], matchup_dict['s_std_BF'], matchup_dict['s_avg_xHA_per_BF'], matchup_dict['s_std_xHA_per_BF'] = get_pitcher_stats(statcast_df[(statcast_df['pitcher'] == pitcher_id) & (statcast_df['starter_flg'] == True)])
-            matchup_dict['bp_avg_xHA_per_BF'], matchup_dict['bp_std_xHA_per_BF'] = get_pitcher_stats(statcast_df[(statcast_df['opponent'] == team_abbreviation) & (statcast_df['starter_flg'] == False)], bullpen=True)
+                matchup_dict['sp_xHA_per_BF_interval']  = get_pitcher_stats(statcast_df[(statcast_df['pitcher'] == pitcher_id) & (statcast_df['starter_flg'] == True)])
+            matchup_dict['bp_xHA_per_BF_interval'] = get_pitcher_stats(statcast_df[(statcast_df['opponent'] == team_abbreviation) & (statcast_df['starter_flg'] == False)])
             matchups.append(matchup_dict)
     matchups_df = pd.DataFrame(matchups).rename({'team': 'pitching_team'}, axis=1)
     return matchups_df
 
 
-def get_pitcher_stats(df, bullpen=False, since_date=None):
+def get_pitcher_stats(df, since_date=None):
     if since_date != None:
         df = df[df['game_date'] >= since_date]
     df_grouped = df.groupby(['game_date', 'game_pk'])
     xHA = df_grouped.agg({'xBA': ['sum', 'mean']}).reset_index()
     xHA.columns = ["_".join(x) for x in xHA.columns.ravel()]
     xHA.rename({'xBA_sum': 'xHA', 'xBA_mean': 'xHA_per_BF'}, axis=1, inplace=True)
-    if bullpen == False:
-        tbf_df = df_grouped.size().reset_index().rename({0: 'tbf'}, axis=1)
-        return tbf_df['tbf'].mean(), tbf_df['tbf'].std(), xHA['xHA_per_BF'].mean(), xHA['xHA_per_BF'].std()
+    if len(xHA.index):
+        q1, q2, q3 = np.percentile(xHA['xHA_per_BF'], 25), np.percentile(xHA['xHA_per_BF'], 50), np.percentile(xHA['xHA_per_BF'], 75)
+        tup = round(q1, 2), round(q2, 2), round(q3, 2)
+        return str(tup)
     else:
-        return xHA['xHA_per_BF'].mean(), xHA['xHA_per_BF'].std()
+        return ''

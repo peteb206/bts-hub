@@ -33,11 +33,12 @@ def index():
     calculations_df = pd.merge(general_info_df, calculations_df, how='right', on='player_id')
     all_df = pd.merge(calculations_df, calculations_df_x_days, how='left', on='player_id', suffixes=('_total', f'_{last_x_days}'))
     all_df = pd.merge(all_df, get_opponent_info(statcast_df, today), how='left', left_on='team', right_on='opponent').drop(['game_number', 'opponent'], axis=1).rename({'pitching_team': 'opponent'}, axis=1)
+    all_df['opponent'] = np.where(all_df['home_away'] == 'away', all_df['opponent'], '@' + all_df['opponent'])
     all_df['player_name'] = all_df['player_name'].apply(lambda name: ' '.join(name.split(',')[::-1]).strip())
 
     pd.set_option('expand_frame_repr', False)
-    print('\n', 'Season and Recent expected Hit-Game % >= 50%:', '\n', '\n', all_df[(all_df['x_hit_pct_total'] >= 0.5) & (all_df['x_hit_pct_{}'.format(last_x_days)] >= 0.5)], sep='')
-    out_dict = all_df.fillna('').to_dict('records')
+    # print('\n', 'Season and Recent expected Hit-Game % >= 50%:', '\n', '\n', all_df[(all_df['x_hit_pct_total'] >= 0.5) & (all_df['x_hit_pct_{}'.format(last_x_days)] >= 0.5)], sep='')
+    out_dict = all_df[~all_df['opponent'].isnull()].fillna('').to_dict('records')
     return jsonify(out_dict)
 
 
@@ -186,6 +187,7 @@ def get_opponent_info(statcast_df, today):
             matchup_dict = dict()
             matchup_dict['team'] = team_abbreviation
             matchup_dict['opponent'] = opposing_team_abbreviation
+            matchup_dict['home_away'] = home_away
             matchup_dict['game_number'] = game_number
             if 'probablePitcher' in team.keys():
                 pitcher_id = team['probablePitcher']['id']
@@ -203,7 +205,7 @@ def get_pitcher_stats(df, since_date=None):
         df = df[df['game_date'] >= since_date]
     df_grouped = df.groupby(['game_date', 'game_pk'])
     xHA = df_grouped.agg({'xBA': ['sum', 'mean']}).reset_index()
-    xHA.columns = ["_".join(x) for x in xHA.columns.ravel()]
+    xHA.columns = ['_'.join(col) for col in xHA.columns.values]
     xHA.rename({'xBA_sum': 'xHA', 'xBA_mean': 'xHA_per_BF'}, axis=1, inplace=True)
     if len(xHA.index):
         q1, q2, q3 = np.percentile(xHA['xHA_per_BF'], 25), np.percentile(xHA['xHA_per_BF'], 50), np.percentile(xHA['xHA_per_BF'], 75)

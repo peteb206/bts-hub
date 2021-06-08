@@ -7,6 +7,7 @@ import os
 import sys
 import datetime
 import time
+from dateutil import tz
 import pymongo
 
 
@@ -34,6 +35,7 @@ def index():
     all_df = pd.merge(calculations_df, calculations_df_x_days, how='left', on='player_id', suffixes=('_total', f'_{last_x_days}'))
     all_df = pd.merge(all_df, get_opponent_info(statcast_df, today), how='left', left_on='team', right_on='opponent').drop(['game_number', 'opponent'], axis=1).rename({'pitching_team': 'opponent'}, axis=1)
     all_df['opponent'] = np.where(all_df['home_away'] == 'away', all_df['opponent'], '@' + all_df['opponent'])
+    all_df['opponent'] = all_df['opponent'] + ' (' + all_df['game_time'] + ')'
     all_df['player_name'] = all_df['player_name'].apply(lambda name: ' '.join(name.split(',')[::-1]).strip())
 
     pd.set_option('expand_frame_repr', False)
@@ -179,6 +181,11 @@ def get_opponent_info(statcast_df, today):
     games = response_dict['schedule']['dates'][0]['games']
     for game in games:
         game_number = game['gameNumber']
+        game_pk = game['gamePk']
+        game_time_utc = datetime.datetime.strptime(game['gameDate'], '%Y-%m-%dT%H:%M:%SZ')
+        game_time_utc = game_time_utc.replace(tzinfo=tz.gettz('UTC'))
+        game_time_current_time_zone = game_time_utc.astimezone(tz.tzlocal())
+        game_time_string = game_time_current_time_zone.strftime('%I:%M %p')
         teams = game['teams']
         for home_away in ['away', 'home']:
             team = teams[home_away]
@@ -188,7 +195,9 @@ def get_opponent_info(statcast_df, today):
             matchup_dict['team'] = team_abbreviation
             matchup_dict['opponent'] = opposing_team_abbreviation
             matchup_dict['home_away'] = home_away
+            matchup_dict['game_pk'] = game_pk
             matchup_dict['game_number'] = game_number
+            matchup_dict['game_time'] = game_time_string
             if 'probablePitcher' in team.keys():
                 pitcher_id = team['probablePitcher']['id']
                 matchup_dict['pitcher_id'] = pitcher_id

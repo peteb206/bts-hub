@@ -32,6 +32,15 @@
                   return data.toFixed(2).toString();
                }
             }
+            var batterLinkFunc = function (data, type, row) {
+               return '<a href="https://www.mlb.com/player/' + row.player_id + '" target="_blank">' + data + '</a>';
+            }
+            var pitcherLinkFunc = function (data, type, row) {
+               return '<a href="https://www.mlb.com/player/' + row.pitcher_id + '" target="_blank">' + data + '</a>';
+            }
+            var gameLinkFunc = function (data, type, row) {
+               return '<a href="https://www.mlb.com/gameday/' + row.game_pk + '" target="_blank">' + data + '</a>';
+            }
             var last_x_days = 7;
             $('table.display').DataTable({
                ajax: {
@@ -41,7 +50,8 @@
                columns: [
                   {
                      data: 'player_name',
-                     title: 'Name'
+                     title: 'Name',
+                     render: batterLinkFunc
                   }, {
                      data: 'team',
                      title: 'Team'
@@ -80,10 +90,12 @@
                      render: percentFunc
                   }, {
                      data: 'opponent',
-                     title: 'Opponent'
+                     title: 'Opponent',
+                     render: gameLinkFunc
                   }, {
                      data: 'pitcher_name',
-                     title: 'Probable Opposing Starter'
+                     title: 'Probable Opposing Starter',
+                     render: pitcherLinkFunc
                   }, {
                      data: 'sp_xHA_per_BF_interval',
                      title: 'Starter: xHA per Batter (Q1, Q2, Q3)'

@@ -14,10 +14,13 @@
       <script type="text/javascript" charset="utf8" src="https://cdn.datatables.net/1.10.23/js/jquery.dataTables.min.js"></script>
       <script type="text/javascript" charset="utf8" src="https://cdn.datatables.net/fixedcolumns/3.3.3/js/dataTables.fixedColumns.min.js"></script>
       <script>
+
          $(document).ready(function () {
+
             var image = function (data, type, row) {
                return '<img src="https://securea.mlb.com/mlb/images/players/head_shot/' + data + '.jpg" width="40"/>'
             }
+
             var percentFunc = function (data, type, row) {
                if (data === '') {
                   return data;
@@ -25,6 +28,7 @@
                   return (data * 100).toFixed(2).toString() + '%';
                }
             }
+
             var roundFunc = function (data, type, row) {
                if (data === '') {
                   return data;
@@ -32,16 +36,21 @@
                   return data.toFixed(2).toString();
                }
             }
+
             var batterLinkFunc = function (data, type, row) {
-               return '<a href="https://www.mlb.com/player/' + row.player_id + '" target="_blank">' + data + '</a>';
+               return '<a href="https://www.mlb.com/player/' + row.player_id + '" target="_blank" style="text-decoration:none; color:#0076CE">' + data + '</a>';
             }
+
             var pitcherLinkFunc = function (data, type, row) {
-               return '<a href="https://www.mlb.com/player/' + row.pitcher_id + '" target="_blank">' + data + '</a>';
+               return '<a href="https://www.mlb.com/player/' + row.pitcher_id + '" target="_blank" style="text-decoration:none; color:#0076CE">' + data + '</a>';
             }
+
             var gameLinkFunc = function (data, type, row) {
-               return '<a href="https://www.mlb.com/gameday/' + row.game_pk + '" target="_blank">' + data + '</a>';
+               return '<a href="https://www.mlb.com/gameday/' + row.game_pk + '" target="_blank" style="text-decoration:none; color:#0076CE">' + data + '</a>';
             }
+
             var last_x_days = 7;
+
             $('table.display').DataTable({
                ajax: {
                   url: '/loadTableData?days=' + last_x_days,
@@ -63,30 +72,30 @@
                      title: 'H'
                   }, {
                      data: 'xH_per_G_total',
-                     title: 'xH per Game',
+                     title: 'xH / G',
                      render: roundFunc
                   }, {
                      data: 'hit_pct_total',
-                     title: '% of Games w/ Hit',
+                     title: 'HitPct',
                      render: percentFunc
                   }, {
                      data: 'x_hit_pct_total',
-                     title: 'Expected % of Games w/ Hit',
+                     title: 'xHitPct',
                      render: percentFunc
                   }, {
                      data: 'H_' + last_x_days,
-                     title: 'H (last ' + last_x_days + ' days)'
+                     title: 'H (' + last_x_days + ')'
                   }, {
                      data: 'xH_per_G_' + last_x_days,
-                     title: 'xH per Game (last ' + last_x_days + ' days)',
+                     title: 'xH / G (' + last_x_days + ')',
                      render: roundFunc
                   }, {
                      data: 'hit_pct_' + last_x_days,
-                     title: '% of Games w/ Hit (last ' + last_x_days + ' days)',
+                     title: 'HitPct (' + last_x_days + ')',
                      render: percentFunc
                   }, {
                      data: 'x_hit_pct_' + last_x_days,
-                     title: 'Expected % of Games w/ Hit (last ' + last_x_days + ' days)',
+                     title: 'xHitPct (' + last_x_days + ')',
                      render: percentFunc
                   }, {
                      data: 'opponent',
@@ -94,26 +103,31 @@
                      render: gameLinkFunc
                   }, {
                      data: 'pitcher_name',
-                     title: 'Probable Opposing Starter',
+                     title: 'Starter',
                      render: pitcherLinkFunc
                   }, {
                      data: 'sp_xHA_per_BF_interval',
-                     title: 'Starter: xHA per Batter (Q1, Q2, Q3)'
+                     title: 'SP: xHA / PA (Q1, Med., Q3)'
                   }, {
                      data: 'bp_xHA_per_BF_interval',
-                     title: 'Bullpen: xHA per Batter (Q1, Q2, Q3)'
+                     title: 'RP: xHA / PA (Q1, Med., Q3)'
                   }
                ],
                order: [[ 3, 'desc']],
                scrollX: true,
                paging: false,
-               scrollY: '75vh',
+               scrollY: '85vh',
                scrollCollapse: true,
                fixedColumns: {
                   leftColumns: 3
+               },
+               initComplete: function() {
+                  $('th, td').css('white-space', 'nowrap'); // Don't wrap table headers
+                  $('th, td').css('text-align', 'center'); // Center text
                }
             })
          });
+
       </script>
    </head>
    <table class="display"></table>

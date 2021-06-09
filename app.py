@@ -184,7 +184,7 @@ def get_opponent_info(statcast_df, today):
         game_pk = game['gamePk']
         game_time_utc = datetime.datetime.strptime(game['gameDate'], '%Y-%m-%dT%H:%M:%SZ')
         game_time_utc = game_time_utc.replace(tzinfo=tz.gettz('UTC'))
-        game_time_current_time_zone = game_time_utc.astimezone(tz.tzlocal())
+        game_time_current_time_zone = game_time_utc.astimezone(tz.gettz('America/New_York'))
         game_time_string = game_time_current_time_zone.strftime('%I:%M %p')
         teams = game['teams']
         for home_away in ['away', 'home']:
@@ -197,7 +197,7 @@ def get_opponent_info(statcast_df, today):
             matchup_dict['home_away'] = home_away
             matchup_dict['game_pk'] = game_pk
             matchup_dict['game_number'] = game_number
-            matchup_dict['game_time'] = game_time_string
+            matchup_dict['game_time'] = game_time_string if game_time_string[0] != '0' else game_time_string[1:]
             if 'probablePitcher' in team.keys():
                 pitcher_id = team['probablePitcher']['id']
                 matchup_dict['pitcher_id'] = pitcher_id

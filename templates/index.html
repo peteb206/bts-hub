@@ -2,14 +2,19 @@
 <html>
 
 <head>
-   <title>Home</title>
+   <title>Beat the Streak Advisor</title>
 </head>
 
-<body>
+<body style="margin: 5%;">
    <head>
       <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.10.23/css/jquery.dataTables.css">
       <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/buttons/1.6.5/css/buttons.dataTables.min.css">
       <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/fixedcolumns/3.3.3/css/fixedColumns.dataTables.min.css">
+      <style>
+         .border_left {
+            border-left: 2px solid;
+         }
+      </style>
       <script type="text/javascript" charset="utf8" src="https://code.jquery.com/jquery-3.5.1.js"></script>
       <script type="text/javascript" charset="utf8" src="https://cdn.datatables.net/1.10.23/js/jquery.dataTables.min.js"></script>
       <script type="text/javascript" charset="utf8" src="https://cdn.datatables.net/fixedcolumns/3.3.3/js/dataTables.fixedColumns.min.js"></script>
@@ -42,7 +47,15 @@
             }
 
             var pitcherLinkFunc = function (data, type, row) {
-               return '<a href="https://www.mlb.com/player/' + row.pitcher_id + '" target="_blank" style="text-decoration:none; color:#0076CE">' + data + '</a>';
+               var delim = '('
+               var split = data.split(delim)
+               var name = split[0]
+               var rest = '';
+               if (split.length > 1) {
+                  rest = delim + split[1]
+               }
+               rest += (' ' + row.sp_xHA_per_BF_interval);
+               return '<a href="https://www.mlb.com/player/' + row.pitcher_id + '" target="_blank" style="text-decoration:none; color:#0076CE">' + name + '</a>' + rest;
             }
 
             var gameLinkFunc = function (data, type, row) {
@@ -53,8 +66,7 @@
 
             $('table.display').DataTable({
                ajax: {
-                  url: '/loadTableData?days=' + last_x_days,
-                  dataSrc: ''
+                  url: '/loadTableData?days=' + last_x_days
                },
                columns: [
                   {
@@ -69,7 +81,8 @@
                      title: 'B'
                   }, {
                      data: 'H_total',
-                     title: 'H'
+                     title: 'H',
+                     className: 'border_left'
                   }, {
                      data: 'xH_per_G_total',
                      title: 'xH / G',
@@ -84,7 +97,8 @@
                      render: percentFunc
                   }, {
                      data: 'H_' + last_x_days,
-                     title: 'H (' + last_x_days + ')'
+                     title: 'H (' + last_x_days + ')',
+                     className: 'border_left'
                   }, {
                      data: 'xH_per_G_' + last_x_days,
                      title: 'xH / G (' + last_x_days + ')',
@@ -100,14 +114,12 @@
                   }, {
                      data: 'opponent',
                      title: 'Opponent',
-                     render: gameLinkFunc
+                     render: gameLinkFunc,
+                     className: 'border_left'
                   }, {
                      data: 'pitcher_name',
-                     title: 'Starter',
+                     title: 'SP: xHA / PA (Q1, Med., Q3)',
                      render: pitcherLinkFunc
-                  }, {
-                     data: 'sp_xHA_per_BF_interval',
-                     title: 'SP: xHA / PA (Q1, Med., Q3)'
                   }, {
                      data: 'bp_xHA_per_BF_interval',
                      title: 'RP: xHA / PA (Q1, Med., Q3)'
@@ -116,20 +128,34 @@
                order: [[ 3, 'desc']],
                scrollX: true,
                paging: false,
-               scrollY: '85vh',
+               scrollY: '75vh',
                scrollCollapse: true,
                fixedColumns: {
                   leftColumns: 3
                },
-               initComplete: function() {
+               dom: '<"toolbar">frtip',
+               initComplete: function(oSettings, json) {
                   $('th, td').css('white-space', 'nowrap'); // Don't wrap table headers
                   $('th, td').css('text-align', 'center'); // Center text
+
+                  var toolbarHtml = '<div style="float: left;">';
+                     toolbarHtml += '   <p>Most recent statcast data: ';
+                     toolbarHtml += '      <span style="color: red;">' + json.lastUpdated + '</span>';
+                     toolbarHtml += '   </p>';
+                     toolbarHtml += '</div>';
+
+                  $('div.toolbar').html(toolbarHtml);
                }
             })
          });
 
       </script>
    </head>
+   <div style="margin: 0 auto; width: 200px;">
+      <h3>
+         <a href="https://bts-web.mlb.com/mlb/fantasy/bts/y2021/index.jsp#t=picks" target="_blank" style="text-decoration:none; color:#0076CE">Beat the Streak Advisor</a>
+      </h3>
+   </div>
    <table class="display"></table>
 </body>
 

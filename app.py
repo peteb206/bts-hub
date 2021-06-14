@@ -5,6 +5,7 @@ import requests
 import json
 import os
 import sys
+import math
 import datetime
 import time
 from dateutil import tz
@@ -21,6 +22,9 @@ def home():
 
 @app.route("/loadTableData")
 def index():
+    last_x_days = int(request.args.get('days'))
+    min_hits = int(request.args.get('hitMin'))
+
     today = datetime.date.today()
     statcast_data = get_statcast_data(today)
     statcast_df = statcast_data[0]
@@ -31,7 +35,6 @@ def index():
     general_info_df.drop_duplicates(subset='player_id', inplace=True)
 
     calculations_df = calculate_hit_pct(statcast_df)
-    last_x_days = int(request.args.get('days'))
     x_days_ago = today - datetime.timedelta(days=last_x_days + 1)
     calculations_df_x_days = calculate_hit_pct(statcast_df, since_date=x_days_ago.strftime('%Y-%m-%d'))
     calculations_df_x_days.drop('player_name', axis=1, inplace=True)
@@ -45,8 +48,9 @@ def index():
 
     pd.set_option('expand_frame_repr', False)
     # print('\n', 'Season and Recent expected Hit-Game % >= 50%:', '\n', '\n', all_df[(all_df['x_hit_pct_total'] >= 0.5) & (all_df['x_hit_pct_{}'.format(last_x_days)] >= 0.5)], sep='')
+    all_df = color_columns(all_df[~all_df['opponent'].isnull()], min_hits, last_x_days)
     out_dict = dict()
-    out_dict['data'] = all_df[~all_df['opponent'].isnull()].fillna('').to_dict('records')
+    out_dict['data'] = all_df.fillna('').to_dict('records')
     out_dict['lastUpdated'] = last_date
     return jsonify(out_dict)
 
@@ -230,3 +234,20 @@ def get_pitcher_stats(df, since_date=None):
         return str(tup)
     else:
         return ''
+
+
+def color_columns(df, min_hits, last_x_days):
+    df_new = df.copy()
+    df_new = df_new[df_new['H_total'] >= min_hits]
+    rwg = ['#F8696B', '#F86B6D', '#F86E70', '#F87173', '#F87476', '#F87779', '#F87A7C', '#F87D7F', '#F88082', '#F88385', '#F88688', '#F8898B', '#F88C8E', '#F98F91', '#F99294', '#F99597', '#F9989A', '#F99A9D', '#F99DA0', '#F9A0A3', '#F9A3A6', '#F9A6A9', '#F9A9AC', '#F9ACAF', '#F9AFB2', '#FAB2B5', '#FAB5B7', '#FAB8BA', '#FABBBD', '#FABEC0', '#FAC1C3', '#FAC4C6', '#FAC7C9', '#FACACC', '#FACCCF', '#FACFD2', '#FAD2D5', '#FAD5D8', '#FBD8DB', '#FBDBDE', '#FBDEE1', '#FBE1E4', '#FBE4E7', '#FBE7EA', '#FBEAED', '#FBEDF0', '#FBF0F3', '#FBF3F6', '#FBF6F9', '#FBF9FC', '#FCFCFF', '#F9FBFD', '#F6FAFA', '#F3F9F8', '#F0F8F5', '#EDF6F2', '#EAF5F0', '#E7F4ED', '#E4F3EA', '#E1F1E8', '#DEF0E5', '#DBEFE2', '#D8EEE0', '#D5ECDD', '#D2EBDB', '#CFEAD8', '#CCE9D5', '#C8E7D3', '#C5E6D0', '#C2E5CD', '#BFE4CB', '#BCE2C8', '#B9E1C5', '#B6E0C3', '#B3DFC0', '#B0DDBD', '#ADDCBB', '#AADBB8', '#A7DAB6', '#A4D9B3', '#A1D7B0', '#9ED6AE', '#9BD5AB', '#98D4A8', '#94D2A6', '#91D1A3', '#8ED0A0', '#8BCF9E', '#88CD9B', '#85CC99', '#82CB96', '#7FCA93', '#7CC891', '#79C78E', '#76C68B', '#73C589', '#70C386', '#6DC283', '#6AC181', '#67C07E', '#63BE7B']
+    gwr = rwg[::-1]
+
+    percentile_columns = ['H', 'xH_per_G', 'hit_pct', 'x_hit_pct']
+    descending_columns = []
+    for column in percentile_columns:
+        for column_subset in ['total', str(last_x_days)]:
+            column_w_subset = column + '_' + column_subset
+            if (column_w_subset in df_new.columns):
+                df_new[column_w_subset + '_color'] = df_new[column_w_subset].fillna(0).rank(pct=True)
+                df_new[column_w_subset + '_color'] = df_new[column_w_subset + '_color'].apply(lambda x: gwr[math.floor(x * 100)] if column in descending_columns else rwg[math.floor(x * 100)])
+    return df_new

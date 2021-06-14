@@ -5,7 +5,7 @@
    <title>Beat the Streak Advisor</title>
 </head>
 
-<body style="margin: 5%;">
+<body>
    <head>
       <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.10.23/css/jquery.dataTables.css">
       <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/buttons/1.6.5/css/buttons.dataTables.min.css">
@@ -64,72 +64,75 @@
 
             var last_x_days = 7;
 
+            var cols = [
+               {
+                  data: 'player_name',
+                  title: 'Name',
+                  render: batterLinkFunc
+               }, {
+                  data: 'team',
+                  title: 'Team'
+               }, {
+                  data: 'batter_handedness',
+                  title: 'B'
+               }, {
+                  data: 'H_total',
+                  title: 'H',
+                  className: 'border_left'
+               }, {
+                  data: 'xH_per_G_total',
+                  title: 'xH / G',
+                  render: roundFunc
+               }, {
+                  data: 'hit_pct_total',
+                  title: 'HitPct',
+                  render: percentFunc
+               }, {
+                  data: 'x_hit_pct_total',
+                  title: 'xHitPct',
+                  render: percentFunc
+               }, {
+                  data: 'H_' + last_x_days,
+                  title: 'H (' + last_x_days + ')',
+                  className: 'border_left'
+               }, {
+                  data: 'xH_per_G_' + last_x_days,
+                  title: 'xH / G (' + last_x_days + ')',
+                  render: roundFunc
+               }, {
+                  data: 'hit_pct_' + last_x_days,
+                  title: 'HitPct (' + last_x_days + ')',
+                  render: percentFunc
+               }, {
+                  data: 'x_hit_pct_' + last_x_days,
+                  title: 'xHitPct (' + last_x_days + ')',
+                  render: percentFunc
+               }, {
+                  data: 'opponent',
+                  title: 'Opponent',
+                  render: gameLinkFunc,
+                  className: 'border_left'
+               }, {
+                  data: 'pitcher_name',
+                  title: 'SP: xHA / PA (Q1, Med., Q3)',
+                  render: pitcherLinkFunc
+               }, {
+                  data: 'bp_xHA_per_BF_interval',
+                  title: 'RP: xHA / PA (Q1, Med., Q3)'
+               }
+            ]
+
             $('table.display').DataTable({
                ajax: {
-                  url: '/loadTableData?days=' + last_x_days
+                  url: '/loadTableData?hitMin=15&days=' + last_x_days
                },
-               columns: [
-                  {
-                     data: 'player_name',
-                     title: 'Name',
-                     render: batterLinkFunc
-                  }, {
-                     data: 'team',
-                     title: 'Team'
-                  }, {
-                     data: 'batter_handedness',
-                     title: 'B'
-                  }, {
-                     data: 'H_total',
-                     title: 'H',
-                     className: 'border_left'
-                  }, {
-                     data: 'xH_per_G_total',
-                     title: 'xH / G',
-                     render: roundFunc
-                  }, {
-                     data: 'hit_pct_total',
-                     title: 'HitPct',
-                     render: percentFunc
-                  }, {
-                     data: 'x_hit_pct_total',
-                     title: 'xHitPct',
-                     render: percentFunc
-                  }, {
-                     data: 'H_' + last_x_days,
-                     title: 'H (' + last_x_days + ')',
-                     className: 'border_left'
-                  }, {
-                     data: 'xH_per_G_' + last_x_days,
-                     title: 'xH / G (' + last_x_days + ')',
-                     render: roundFunc
-                  }, {
-                     data: 'hit_pct_' + last_x_days,
-                     title: 'HitPct (' + last_x_days + ')',
-                     render: percentFunc
-                  }, {
-                     data: 'x_hit_pct_' + last_x_days,
-                     title: 'xHitPct (' + last_x_days + ')',
-                     render: percentFunc
-                  }, {
-                     data: 'opponent',
-                     title: 'Opponent',
-                     render: gameLinkFunc,
-                     className: 'border_left'
-                  }, {
-                     data: 'pitcher_name',
-                     title: 'SP: xHA / PA (Q1, Med., Q3)',
-                     render: pitcherLinkFunc
-                  }, {
-                     data: 'bp_xHA_per_BF_interval',
-                     title: 'RP: xHA / PA (Q1, Med., Q3)'
-                  }
-               ],
-               order: [[ 3, 'desc']],
+               columns: cols,
+               order: [[ 5, 'desc']],
                scrollX: true,
                paging: false,
                scrollY: '75vh',
                scrollCollapse: true,
+               autoWidth: false,
                fixedColumns: {
                   leftColumns: 3
                },
@@ -145,6 +148,14 @@
                      toolbarHtml += '</div>';
 
                   $('div.toolbar').html(toolbarHtml);
+               },
+               rowCallback: function(row, data, index) {
+                  Object.keys(data).forEach(function(key, colIndex) {
+                     if (data[key + '_color']) {
+                        colDisplayIndex = cols.findIndex(item => item.data === key)
+                        $(row).find('td:eq(' + colDisplayIndex + ')').css('background-color', data[key + '_color']);
+                     }
+                  });
                }
             })
          });
@@ -156,7 +167,9 @@
          <a href="https://bts-web.mlb.com/mlb/fantasy/bts/y2021/index.jsp#t=picks" target="_blank" style="text-decoration:none; color:#0076CE">Beat the Streak Advisor</a>
       </h3>
    </div>
-   <table class="display"></table>
+   <div style="margin: 0% 3%;">
+      <table class="display"></table>
+   </div>
 </body>
 
 </html>

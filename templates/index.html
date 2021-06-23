@@ -42,20 +42,16 @@
                }
             }
 
+            var playerLinkFunc = function(id, name) {
+               return '<a href="https://www.mlb.com/player/' + id + '" target="_blank" style="text-decoration:none; color:#0076CE">' + name + '</a>';
+            }
+
             var batterLinkFunc = function (data, type, row) {
-               return '<a href="https://www.mlb.com/player/' + row.player_id + '" target="_blank" style="text-decoration:none; color:#0076CE">' + data + '</a>';
+               return playerLinkFunc(row.player_id, data);
             }
 
             var pitcherLinkFunc = function (data, type, row) {
-               var delim = '('
-               var split = data.split(delim)
-               var name = split[0]
-               var rest = '';
-               if (split.length > 1) {
-                  rest = delim + split[1]
-               }
-               rest += (' ' + row.sp_xHA_per_BF_interval);
-               return '<a href="https://www.mlb.com/player/' + row.pitcher_id + '" target="_blank" style="text-decoration:none; color:#0076CE">' + name + '</a>' + rest;
+               return playerLinkFunc(row.pitcher_id, data);
             }
 
             var gameLinkFunc = function (data, type, row) {
@@ -114,8 +110,11 @@
                   className: 'border_left'
                }, {
                   data: 'pitcher_name',
-                  title: 'SP: xHA / PA (Q1, Med., Q3)',
+                  title: 'Starter',
                   render: pitcherLinkFunc
+               }, {
+                  data: 'sp_xHA_per_BF_interval',
+                  title: 'SP: xHA / PA (Q1, Med., Q3)'
                }, {
                   data: 'bp_xHA_per_BF_interval',
                   title: 'RP: xHA / PA (Q1, Med., Q3)'

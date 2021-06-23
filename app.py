@@ -196,8 +196,8 @@ def get_opponent_info(statcast_df, today):
         game_pk = game['gamePk']
         game_time_utc = datetime.datetime.strptime(game['gameDate'], '%Y-%m-%dT%H:%M:%SZ')
         game_time_utc = game_time_utc.replace(tzinfo=tz.gettz('UTC'))
-        game_time_current_time_zone = game_time_utc.astimezone(tz.gettz('America/New_York'))
-        game_time_string = game_time_current_time_zone.strftime('%I:%M %p')
+        game_time_current_time_zone = game_time_utc.astimezone(tz.gettz('America/Chicago'))
+        game_time_string = game_time_current_time_zone.strftime('%I:%M %p %Z')
         teams = game['teams']
         for home_away in ['away', 'home']:
             team = teams[home_away]

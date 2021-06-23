@@ -163,7 +163,7 @@ def get_statcast_data(today):
 
     # Stop timer
     print('\n', 'Done retrieving statcast data!', '\n', '\n', '--- Total time: {} minutes ---'.format(str(round((time.time() - start_time) / 60, 2))), sep='')
-    return df, last_date
+    return df, df['game_date'].values[-1]
 
 
 def calculate_hit_pct(statcast_df, since_date=None):

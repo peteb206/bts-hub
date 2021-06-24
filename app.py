@@ -214,8 +214,8 @@ def get_opponent_info(statcast_df, today):
                 pitcher_id = team['probablePitcher']['id']
                 matchup_dict['pitcher_id'] = pitcher_id
                 matchup_dict['pitcher_name'] = team['probablePitcher']['firstLastName'] + ' (' + team['probablePitcher']['pitchHand']['code'] + ')'
-                matchup_dict['sp_xHA_per_BF_interval']  = get_pitcher_stats(statcast_df[(statcast_df['pitcher'] == pitcher_id) & (statcast_df['starter_flg'] == True)])
-            matchup_dict['bp_xHA_per_BF_interval'] = get_pitcher_stats(statcast_df[(statcast_df['opponent'] == team_abbreviation) & (statcast_df['starter_flg'] == False)])
+                matchup_dict['sp_HA_per_BF_total'], matchup_dict['sp_xHA_per_BF_total']  = get_pitcher_stats(statcast_df[(statcast_df['pitcher'] == pitcher_id) & (statcast_df['starter_flg'] == True)])
+            matchup_dict['bp_HA_per_BF_total'], matchup_dict['bp_xHA_per_BF_total'] = get_pitcher_stats(statcast_df[(statcast_df['opponent'] == team_abbreviation) & (statcast_df['starter_flg'] == False)])
             matchups.append(matchup_dict)
     matchups_df = pd.DataFrame(matchups).rename({'team': 'pitching_team'}, axis=1)
     return matchups_df
@@ -224,16 +224,10 @@ def get_opponent_info(statcast_df, today):
 def get_pitcher_stats(df, since_date=None):
     if since_date != None:
         df = df[df['game_date'] >= since_date]
-    df_grouped = df.groupby(['game_date', 'game_pk'])
-    xHA = df_grouped.agg({'xBA': ['sum', 'mean']}).reset_index()
-    xHA.columns = ['_'.join(col) for col in xHA.columns.values]
-    xHA.rename({'xBA_sum': 'xHA', 'xBA_mean': 'xHA_per_BF'}, axis=1, inplace=True)
-    if len(xHA.index):
-        q1, q2, q3 = np.percentile(xHA['xHA_per_BF'], 25), np.percentile(xHA['xHA_per_BF'], 50), np.percentile(xHA['xHA_per_BF'], 75)
-        tup = round(q1, 2), round(q2, 2), round(q3, 2)
-        return str(tup)
+    if len(df.index):
+        return round(df['hit'].mean(), 2), round(df['xBA'].mean(), 2)
     else:
-        return ''
+        return np.nan, np.nan
 
 
 def color_columns(df, min_hits, last_x_days):
@@ -242,7 +236,7 @@ def color_columns(df, min_hits, last_x_days):
     rwg = ['#F8696B', '#F86B6D', '#F86E70', '#F87173', '#F87476', '#F87779', '#F87A7C', '#F87D7F', '#F88082', '#F88385', '#F88688', '#F8898B', '#F88C8E', '#F98F91', '#F99294', '#F99597', '#F9989A', '#F99A9D', '#F99DA0', '#F9A0A3', '#F9A3A6', '#F9A6A9', '#F9A9AC', '#F9ACAF', '#F9AFB2', '#FAB2B5', '#FAB5B7', '#FAB8BA', '#FABBBD', '#FABEC0', '#FAC1C3', '#FAC4C6', '#FAC7C9', '#FACACC', '#FACCCF', '#FACFD2', '#FAD2D5', '#FAD5D8', '#FBD8DB', '#FBDBDE', '#FBDEE1', '#FBE1E4', '#FBE4E7', '#FBE7EA', '#FBEAED', '#FBEDF0', '#FBF0F3', '#FBF3F6', '#FBF6F9', '#FBF9FC', '#FCFCFF', '#F9FBFD', '#F6FAFA', '#F3F9F8', '#F0F8F5', '#EDF6F2', '#EAF5F0', '#E7F4ED', '#E4F3EA', '#E1F1E8', '#DEF0E5', '#DBEFE2', '#D8EEE0', '#D5ECDD', '#D2EBDB', '#CFEAD8', '#CCE9D5', '#C8E7D3', '#C5E6D0', '#C2E5CD', '#BFE4CB', '#BCE2C8', '#B9E1C5', '#B6E0C3', '#B3DFC0', '#B0DDBD', '#ADDCBB', '#AADBB8', '#A7DAB6', '#A4D9B3', '#A1D7B0', '#9ED6AE', '#9BD5AB', '#98D4A8', '#94D2A6', '#91D1A3', '#8ED0A0', '#8BCF9E', '#88CD9B', '#85CC99', '#82CB96', '#7FCA93', '#7CC891', '#79C78E', '#76C68B', '#73C589', '#70C386', '#6DC283', '#6AC181', '#67C07E', '#63BE7B']
     gwr = rwg[::-1]
 
-    percentile_columns = ['H', 'xH_per_G', 'hit_pct', 'x_hit_pct']
+    percentile_columns = ['H', 'xH_per_G', 'hit_pct', 'x_hit_pct', 'sp_HA_per_BF', 'sp_xHA_per_BF', 'bp_HA_per_BF', 'bp_xHA_per_BF']
     descending_columns = []
     for column in percentile_columns:
         for column_subset in ['total', str(last_x_days)]:

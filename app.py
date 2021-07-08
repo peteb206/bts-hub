@@ -253,7 +253,7 @@ def color_columns(df, min_hits, last_x_days):
 
 def get_weather():
     html = requests.get('https://www.rotowire.com/baseball/weather.php').text
-    soup = BeautifulSoup(html, 'html.parser')
+    soup = BeautifulSoup(html, 'lxml')
 
     teams = dict()
     for weather_box in soup.find_all('div', {'class': 'weather-box'}):

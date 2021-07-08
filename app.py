@@ -10,6 +10,8 @@ import datetime
 import time
 from dateutil import tz
 import pymongo
+from bs4 import BeautifulSoup
+import re
 
 
 app = Flask(__name__)
@@ -49,6 +51,8 @@ def index():
     pd.set_option('expand_frame_repr', False)
     # print('\n', 'Season and Recent expected Hit-Game % >= 50%:', '\n', '\n', all_df[(all_df['x_hit_pct_total'] >= 0.5) & (all_df['x_hit_pct_{}'.format(last_x_days)] >= 0.5)], sep='')
     all_df = color_columns(all_df[~all_df['opponent'].isnull()], min_hits, last_x_days)
+    weather = get_weather()
+    all_df['weather'] = all_df['team'].apply(lambda x: weather[x])
     out_dict = dict()
     out_dict['data'] = all_df.fillna('').to_dict('records')
     out_dict['lastUpdated'] = last_date
@@ -245,3 +249,18 @@ def color_columns(df, min_hits, last_x_days):
                 df_new[column_w_subset + '_color'] = df_new[column_w_subset].fillna(0).rank(pct=True)
                 df_new[column_w_subset + '_color'] = df_new[column_w_subset + '_color'].apply(lambda x: gwr[math.floor(x * 100)] if column in descending_columns else rwg[math.floor(x * 100)])
     return df_new
+
+
+def get_weather():
+    html = requests.get('https://www.rotowire.com/baseball/weather.php').text
+    soup = BeautifulSoup(html, 'html.parser')
+
+    teams = dict()
+    for weather_box in soup.find_all('div', {'class': 'weather-box'}):
+        weather_box_teams = weather_box.find('div', {'class': 'weather-box__teams'})
+        weather_box_weather = weather_box.find('div', {'class': 'weather-box__weather'})
+        for link in weather_box_teams.find_all('a'):
+            teams[link['href'].split('=')[1]] = re.search('([^\/]+$)', weather_box_weather.find('img')['src']).group()
+    if 'WAS' in teams.keys():
+        teams['WSH'] = teams.pop('WAS')
+    return teams

@@ -19,7 +19,7 @@ app = Flask(__name__)
 
 @app.route('/')
 def home():
-   return render_template('index.html')
+    return render_template('index.html')
 
 
 @app.route("/loadTableData")
@@ -43,9 +43,12 @@ def index():
 
     calculations_df = pd.merge(general_info_df, calculations_df, how='right', on='player_id')
     all_df = pd.merge(calculations_df, calculations_df_x_days, how='left', on='player_id', suffixes=('_total', f'_{last_x_days}'))
-    all_df = pd.merge(all_df, get_opponent_info(statcast_df, today), how='left', left_on='team', right_on='opponent').drop(['game_number', 'opponent'], axis=1).rename({'pitching_team': 'opponent'}, axis=1)
-    all_df['opponent'] = np.where(all_df['home_away'] == 'away', all_df['opponent'], '@' + all_df['opponent'])
-    all_df['opponent'] = all_df['opponent'] + ' (' + all_df['game_time'] + ')'
+    try:
+        all_df = pd.merge(all_df, get_opponent_info(statcast_df, today), how='left', left_on='team', right_on='opponent').drop(['game_number', 'opponent'], axis=1).rename({'pitching_team': 'opponent'}, axis=1)
+        all_df['opponent'] = np.where(all_df['home_away'] == 'away', all_df['opponent'], '@' + all_df['opponent'])
+        all_df['opponent'] = all_df['opponent'] + ' (' + all_df['game_time'] + ')'
+    except:
+        all_df['opponent'] = ''
     all_df['player_name'] = all_df['player_name'].apply(lambda name: ' '.join(name.split(',')[::-1]).strip())
 
     head_to_head = batter_vs_pitcher()
@@ -54,7 +57,7 @@ def index():
     all_df['xH_vs_SP'] = all_df['player_id'].apply(lambda x: head_to_head[x]['xH_vs_SP'] if x in head_to_head.keys() else np.nan)
     all_df = color_columns(all_df[~all_df['opponent'].isnull()], min_hits, last_x_days)
     weather = get_weather()
-    all_df['weather'] = all_df['team'].apply(lambda x: weather[x])
+    all_df['weather'] = all_df['team'].apply(lambda x: weather[x] if x in weather.keys() else '')
     out_dict = dict()
     out_dict['data'] = all_df.fillna('').to_dict('records')
     out_dict['lastUpdated'] = last_date

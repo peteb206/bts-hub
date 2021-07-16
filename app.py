@@ -52,9 +52,7 @@ def index():
     all_df['player_name'] = all_df['player_name'].apply(lambda name: ' '.join(name.split(',')[::-1]).strip())
 
     head_to_head = batter_vs_pitcher()
-    all_df['PA_vs_SP'] = all_df['player_id'].apply(lambda x: head_to_head[x]['PA_vs_SP'] if x in head_to_head.keys() else np.nan)
-    all_df['H_vs_SP'] = all_df['player_id'].apply(lambda x: head_to_head[x]['H_vs_SP'] if x in head_to_head.keys() else np.nan)
-    all_df['xH_vs_SP'] = all_df['player_id'].apply(lambda x: head_to_head[x]['xH_vs_SP'] if x in head_to_head.keys() else np.nan)
+    all_df = pd.merge(all_df, head_to_head, how='left', on=['player_id', 'pitcher_id'])
     all_df = color_columns(all_df[~all_df['opponent'].isnull()], min_hits, last_x_days)
     weather = get_weather()
     all_df['weather'] = all_df['team'].apply(lambda x: weather[x] if x in weather.keys() else '')
@@ -224,6 +222,8 @@ def get_opponent_info(statcast_df, today):
                 matchup_dict['pitcher_id'] = pitcher_id
                 matchup_dict['pitcher_name'] = team['probablePitcher']['firstLastName'] + ' (' + team['probablePitcher']['pitchHand']['code'] + ')'
                 matchup_dict['sp_HA_per_BF_total'], matchup_dict['sp_xHA_per_BF_total']  = get_pitcher_stats(statcast_df[(statcast_df['pitcher'] == pitcher_id) & (statcast_df['starter_flg'] == True)])
+            else:
+                matchup_dict['pitcher_id'] = -1
             matchup_dict['bp_HA_per_BF_total'], matchup_dict['bp_xHA_per_BF_total'] = get_pitcher_stats(statcast_df[(statcast_df['opponent'] == team_abbreviation) & (statcast_df['starter_flg'] == False)])
             matchups.append(matchup_dict)
     matchups_df = pd.DataFrame(matchups).rename({'team': 'pitching_team'}, axis=1)
@@ -278,10 +278,10 @@ def get_weather():
 def batter_vs_pitcher():
     html = requests.get('https://baseballsavant.mlb.com/daily_matchups').text
     data = re.search('(matchups_data\s*=\s*)(\[.*\])', html).group(2)
-    df = pd.DataFrame(json.loads(data), columns = ['player_id', 'pa', 'abs', 'hits', 'xba']).set_index('player_id')
+    df = pd.DataFrame(json.loads(data), columns = ['player_id', 'pitcher_id', 'pa', 'abs', 'hits', 'xba'])
     df['PA_vs_SP'] = df['pa'].fillna(np.nan).astype(int, errors = 'ignore')
     df['abs'] = df['abs'].fillna(np.nan).astype(int, errors = 'ignore')
     df['H_vs_SP'] = df['hits'].fillna(np.nan).astype(int, errors = 'ignore')
     df['xba'] = df['xba'].fillna(np.nan).astype(float, errors = 'ignore')
     df['xH_vs_SP'] = round(df['xba'] * df['abs'], 2).fillna(np.nan)
-    return df[['PA_vs_SP', 'H_vs_SP', 'xH_vs_SP']].to_dict('index')
+    return df[['player_id', 'pitcher_id', 'PA_vs_SP', 'H_vs_SP', 'xH_vs_SP']]

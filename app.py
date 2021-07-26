@@ -279,9 +279,9 @@ def batter_vs_pitcher():
     html = requests.get('https://baseballsavant.mlb.com/daily_matchups').text
     data = re.search('(matchups_data\s*=\s*)(\[.*\])', html).group(2)
     df = pd.DataFrame(json.loads(data), columns = ['player_id', 'pitcher_id', 'pa', 'abs', 'hits', 'xba'])
-    df['PA_vs_SP'] = df['pa'].fillna(np.nan).astype(int, errors = 'ignore')
-    df['abs'] = df['abs'].fillna(np.nan).astype(int, errors = 'ignore')
-    df['H_vs_SP'] = df['hits'].fillna(np.nan).astype(int, errors = 'ignore')
+    df['PA_vs_SP'] = df['pa'].fillna(0).astype(int, errors = 'ignore')
+    df['abs'] = df['abs'].fillna(0).astype(int, errors = 'ignore')
+    df['H_vs_SP'] = df['hits'].fillna(0).astype(int, errors = 'ignore')
     df['xba'] = df['xba'].fillna(np.nan).astype(float, errors = 'ignore')
     df['xH_vs_SP'] = round(df['xba'] * df['abs'], 2).fillna(np.nan)
     return df[['player_id', 'pitcher_id', 'PA_vs_SP', 'H_vs_SP', 'xH_vs_SP']]

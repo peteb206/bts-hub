@@ -83,6 +83,9 @@
                   data: 'batter_handedness',
                   title: 'B'
                }, {
+                  data: 'order',
+                  title: 'Lineup'
+               }, {
                   data: 'H_total',
                   title: 'H',
                   className: 'border_left'
@@ -92,11 +95,11 @@
                   render: roundFunc
                }, {
                   data: 'hit_pct_total',
-                  title: 'HitPct',
+                  title: 'Hit %',
                   render: percentFunc
                }, {
                   data: 'x_hit_pct_total',
-                  title: 'xHitPct',
+                  title: 'xHit %',
                   render: percentFunc
                }, {
                   data: 'H_' + last_x_days,
@@ -109,11 +112,11 @@
                   render: roundFunc
                }, {
                   data: 'hit_pct_' + last_x_days,
-                  title: 'HitPct (' + last_x_days + ')',
+                  title: 'Hit % (' + last_x_days + ')',
                   render: percentFunc
                }, {
                   data: 'x_hit_pct_' + last_x_days,
-                  title: 'xHitPct (' + last_x_days + ')',
+                  title: 'xHit % (' + last_x_days + ')',
                   render: percentFunc
                }, {
                   data: 'opponent',
@@ -158,7 +161,7 @@
                   url: '/loadTableData?hitMin=10&days=' + last_x_days
                },
                columns: cols,
-               order: [[ 5, 'desc']],
+               order: [[ 6, 'desc']],
                scrollX: true,
                paging: false,
                scrollY: '75vh',
@@ -169,7 +172,7 @@
                   defaultContent: ''
                }],
                fixedColumns: {
-                  leftColumns: 3
+                  leftColumns: 4
                },
                dom: '<"toolbar">frtip',
                initComplete: function(oSettings, json) {
@@ -187,8 +190,12 @@
                rowCallback: function(row, data, index) {
                   Object.keys(data).forEach(function(key, colIndex) {
                      if (data[key + '_color']) {
-                        colDisplayIndex = cols.findIndex(item => item.data === key)
+                        var colDisplayIndex = cols.findIndex(item => item.data === key);
                         $(row).find('td:eq(' + colDisplayIndex + ')').css('background-color', data[key + '_color']);
+                     }
+                     if (data['order'].toString() === 'OUT') {
+                        $(row).find('td:eq(3)').css('background-color', 'red');
+                        $(row).find('td:eq(3)').css('color', 'white');
                      }
                   });
                }

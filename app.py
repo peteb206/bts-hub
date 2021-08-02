@@ -53,13 +53,14 @@ def index():
 
     head_to_head = batter_vs_pitcher()
     all_df = pd.merge(all_df, head_to_head, how='left', on=['player_id', 'pitcher_id'])
+
+    lineups = get_lineups(today)
+    all_df['order'] = all_df.apply(lambda row: lineups[row['player_id']] if row['player_id'] in lineups.keys() else 'TBD' if lineups[row['team']] == False else 'OUT', axis = 1)
+
     all_df = color_columns(all_df[~all_df['opponent'].isnull()], min_hits, last_x_days)
     weather = get_weather()
     all_df['weather'] = all_df['team'].apply(lambda x: weather[x] if x in weather.keys() else '')
-    out_dict = dict()
-    out_dict['data'] = all_df.fillna('').to_dict('records')
-    out_dict['lastUpdated'] = last_date
-    return jsonify(out_dict)
+    return jsonify({'data': all_df.fillna('').to_dict('records'), 'lastUpdated': last_date})
 
 
 def get_statcast_data(today):
@@ -221,7 +222,7 @@ def get_opponent_info(statcast_df, today):
                 pitcher_id = team['probablePitcher']['id']
                 matchup_dict['pitcher_id'] = pitcher_id
                 matchup_dict['pitcher_name'] = team['probablePitcher']['firstLastName'] + ' (' + team['probablePitcher']['pitchHand']['code'] + ')'
-                matchup_dict['sp_HA_per_BF_total'], matchup_dict['sp_xHA_per_BF_total']  = get_pitcher_stats(statcast_df[(statcast_df['pitcher'] == pitcher_id) & (statcast_df['starter_flg'] == True)])
+                matchup_dict['sp_HA_per_BF_total'], matchup_dict['sp_xHA_per_BF_total']  = get_pitcher_stats(statcast_df[statcast_df['pitcher'] == pitcher_id])
             else:
                 matchup_dict['pitcher_id'] = -1
             matchup_dict['bp_HA_per_BF_total'], matchup_dict['bp_xHA_per_BF_total'] = get_pitcher_stats(statcast_df[(statcast_df['opponent'] == team_abbreviation) & (statcast_df['starter_flg'] == False)])
@@ -285,3 +286,32 @@ def batter_vs_pitcher():
     df['xba'] = df['xba'].fillna(np.nan).astype(float, errors = 'ignore')
     df['xH_vs_SP'] = round(df['xba'] * df['abs'], 2).fillna(np.nan)
     return df[['player_id', 'pitcher_id', 'PA_vs_SP', 'H_vs_SP', 'xH_vs_SP']]
+
+
+def get_lineups(day):
+    html = requests.get('https://www.mlb.com/starting-lineups/{}'.format(day)).text
+    soup = BeautifulSoup(html, 'lxml')
+
+    out_dict = dict()
+    for matchup in soup.find_all('div', {'class': 'starting-lineups__matchup'}):
+        away_team = matchup.find('div', {'class': 'starting-lineups__teams--away-head'}).text.strip().split(' ')[0]
+        home_team = matchup.find('div', {'class': 'starting-lineups__teams--home-head'}).text.strip().split(' ')[0]
+        away_lineup = matchup.find('ol', {'class': 'starting-lineups__team--away'})
+        home_lineup = matchup.find('ol', {'class': 'starting-lineups__team--home'})
+        for team, lineup in {away_team: away_lineup, home_team: home_lineup}.items():
+            slot = 1
+            players = lineup.find_all('li')
+            if len(players) > 1:
+                out_dict[team] = True
+                for player in players:
+                    link = player.find('a')
+                    player_link = link.get('href')
+                    player_id = player_link.split('-')[-1]
+                    try:
+                        out_dict[int(player_id)] = slot
+                    except:
+                        pass
+                    slot += 1
+            else:
+                out_dict[team] = False
+    return out_dict

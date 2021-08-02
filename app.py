@@ -27,7 +27,7 @@ def index():
     last_x_days = int(request.args.get('days'))
     min_hits = int(request.args.get('hitMin'))
 
-    today = datetime.date.today()
+    today = datetime.datetime.now(tz.gettz('America/Chicago')).date()
     statcast_data = get_statcast_data(today)
     statcast_df = statcast_data[0]
     last_date = statcast_data[1]

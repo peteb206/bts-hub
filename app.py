@@ -55,7 +55,7 @@ def index():
     all_df = pd.merge(all_df, head_to_head, how='left', on=['player_id', 'pitcher_id'])
 
     lineups = get_lineups(today)
-    all_df['order'] = all_df.apply(lambda row: lineups[row['player_id']] if row['player_id'] in lineups.keys() else 'TBD' if lineups[row['team']] == False else 'OUT', axis = 1)
+    all_df['order'] = all_df.apply(lambda row: lineup_func(lineups, row['player_id'], row['team']), axis = 1)
 
     all_df = color_columns(all_df[~all_df['opponent'].isnull()], min_hits, last_x_days)
     weather = get_weather()
@@ -289,7 +289,7 @@ def batter_vs_pitcher():
 
 
 def get_lineups(day):
-    html = requests.get('https://www.mlb.com/starting-lineups/{}'.format(day)).text
+    html = requests.get('https://www.mlb.com/starting-lineups/{}'.format(day.strftime('%Y-%m-%d'))).text
     soup = BeautifulSoup(html, 'lxml')
 
     out_dict = dict()
@@ -315,3 +315,13 @@ def get_lineups(day):
             else:
                 out_dict[team] = False
     return out_dict
+
+
+def lineup_func(lineups, player_id, team):
+    out = 'TBD'
+    if player_id in lineups.keys():
+        out = lineups[player_id]
+    elif team in lineups.keys():
+        if lineups[team] == True:
+            out = 'OUT'
+    return out

@@ -24,6 +24,8 @@ def home():
 
 @app.route("/loadTableData")
 def index():
+    start_time = time.time() # Start timer
+
     last_x_days = int(request.args.get('days'))
     min_hits = int(request.args.get('hitMin'))
 
@@ -60,12 +62,16 @@ def index():
     all_df = color_columns(all_df[~all_df['opponent'].isnull()], min_hits, last_x_days)
     weather = get_weather()
     all_df['weather'] = all_df['team'].apply(lambda x: weather[x] if x in weather.keys() else '')
-    return jsonify({'data': all_df.fillna('').to_dict('records'), 'lastUpdated': last_date})
+
+    last_updated_str = '{dt:%A} {dt:%B} {dt.day}, {dt.year}'.format(dt = datetime.datetime.strptime(last_date, '%Y-%m-%d'))
+    out = jsonify({'data': all_df.fillna('').to_dict('records'), 'lastUpdated': last_updated_str})
+
+    stop_timer('Total', start_time) # Stop timer
+    return out
 
 
 def get_statcast_data(today):
-    # Start timer
-    start_time = time.time()
+    start_time = time.time() # Start timer
 
     client = pymongo.MongoClient(os.environ.get('DATABASE_CLIENT'))
     database = client[os.environ.get('DATABASE_NAME')]
@@ -93,36 +99,11 @@ def get_statcast_data(today):
         url = 'https://baseballsavant.mlb.com/statcast_search/csv?'
         url_params = [
             'all=true',
-            'hfPT=',
-            'hfAB=',
             'hfGT=R%7C',
-            'hfPR=',
-            'hfZ=',
-            'stadium=',
-            'hfBBL=',
-            'hfNewZones=',
-            'hfPull=',
-            'hfC=',
             'hfSea=2021%7C',
-            'hfSit=',
             'player_type=batter',
-            'hfOuts=',
-            'opponent=',
-            'pitcher_throws=',
-            'batter_stands=',
-            'hfSA=',
             'game_date_gt={}'.format(start_date_str),
             'game_date_lt={}'.format(end_date_str),
-            'hfInfield=',
-            'team=',
-            'position=',
-            'hfOutfield=',
-            'hfRO=',
-            'home_road=',
-            'hfFlag=',
-            'hfBBT=',
-            'metric_1=',
-            'hfInn=',
             'min_pitches=0',
             'min_results=0',
             'group_by=name',
@@ -169,12 +150,13 @@ def get_statcast_data(today):
     if len(out_dict) > 0: 
         collection.insert_many(out_dict)
 
-    # Stop timer
-    print('\n', 'Done retrieving statcast data!', '\n', '\n', '--- Total time: {} minutes ---'.format(str(round((time.time() - start_time) / 60, 2))), sep='')
+    stop_timer('get_statcast_data()', start_time) # Stop timer
     return df, df['game_date'].values[-1]
 
 
 def calculate_hit_pct(statcast_df, since_date=None):
+    start_time = time.time() # Start timer
+
     keep_cols = ['player_name']
     if since_date != None:
         statcast_df = statcast_df[statcast_df['game_date'] >= since_date]
@@ -190,10 +172,14 @@ def calculate_hit_pct(statcast_df, since_date=None):
     df_by_season = df_by_game.groupby(keep_cols).agg({'H': 'sum', 'xH': 'mean', 'G': 'sum', 'H_1+': 'sum', 'xH_1+': 'sum', 'statcast_G': 'sum'}).reset_index().rename({'batter': 'G', 'xH': 'xH_per_G'}, axis=1)
     df_by_season['hit_pct'] = df_by_season['H_1+'] / df_by_season['G']
     df_by_season['x_hit_pct'] = df_by_season['xH_1+'] / df_by_season['statcast_G']
+
+    stop_timer('calculate_hit_pct()', start_time) # Stop timer
     return df_by_season.drop(['H_1+', 'xH_1+', 'statcast_G'], axis=1)
 
 
 def get_opponent_info(statcast_df, today):
+    start_time = time.time() # Start timer
+
     matchups = list()
     url = 'https://baseballsavant.mlb.com/schedule?date={}'.format(today.strftime('%Y-%m-%d'))
     response_json = requests.get(url).json()
@@ -228,6 +214,8 @@ def get_opponent_info(statcast_df, today):
             matchup_dict['bp_HA_per_BF_total'], matchup_dict['bp_xHA_per_BF_total'] = get_pitcher_stats(statcast_df[(statcast_df['opponent'] == team_abbreviation) & (statcast_df['starter_flg'] == False)])
             matchups.append(matchup_dict)
     matchups_df = pd.DataFrame(matchups).rename({'team': 'pitching_team'}, axis=1)
+
+    stop_timer('get_opponent_info()', start_time) # Stop timer
     return matchups_df
 
 
@@ -241,6 +229,8 @@ def get_pitcher_stats(df, since_date=None):
 
 
 def color_columns(df, min_hits, last_x_days):
+    start_time = time.time() # Start timer
+
     df_new = df.copy()
     df_new = df_new[(df_new['H_total'] >= min_hits) & (df_new['H_{}'.format(last_x_days)] >= 1)]
     rwg = ['#F8696B', '#F86B6D', '#F86E70', '#F87173', '#F87476', '#F87779', '#F87A7C', '#F87D7F', '#F88082', '#F88385', '#F88688', '#F8898B', '#F88C8E', '#F98F91', '#F99294', '#F99597', '#F9989A', '#F99A9D', '#F99DA0', '#F9A0A3', '#F9A3A6', '#F9A6A9', '#F9A9AC', '#F9ACAF', '#F9AFB2', '#FAB2B5', '#FAB5B7', '#FAB8BA', '#FABBBD', '#FABEC0', '#FAC1C3', '#FAC4C6', '#FAC7C9', '#FACACC', '#FACCCF', '#FACFD2', '#FAD2D5', '#FAD5D8', '#FBD8DB', '#FBDBDE', '#FBDEE1', '#FBE1E4', '#FBE4E7', '#FBE7EA', '#FBEAED', '#FBEDF0', '#FBF0F3', '#FBF3F6', '#FBF6F9', '#FBF9FC', '#FCFCFF', '#F9FBFD', '#F6FAFA', '#F3F9F8', '#F0F8F5', '#EDF6F2', '#EAF5F0', '#E7F4ED', '#E4F3EA', '#E1F1E8', '#DEF0E5', '#DBEFE2', '#D8EEE0', '#D5ECDD', '#D2EBDB', '#CFEAD8', '#CCE9D5', '#C8E7D3', '#C5E6D0', '#C2E5CD', '#BFE4CB', '#BCE2C8', '#B9E1C5', '#B6E0C3', '#B3DFC0', '#B0DDBD', '#ADDCBB', '#AADBB8', '#A7DAB6', '#A4D9B3', '#A1D7B0', '#9ED6AE', '#9BD5AB', '#98D4A8', '#94D2A6', '#91D1A3', '#8ED0A0', '#8BCF9E', '#88CD9B', '#85CC99', '#82CB96', '#7FCA93', '#7CC891', '#79C78E', '#76C68B', '#73C589', '#70C386', '#6DC283', '#6AC181', '#67C07E', '#63BE7B']
@@ -258,10 +248,14 @@ def color_columns(df, min_hits, last_x_days):
         if (column in df_new.columns):
             df_new[column + '_color'] = df_new[column].rank(pct=True)
             df_new[column + '_color'] = df_new[column + '_color'].fillna('').apply(lambda x: (gwr[math.floor(x * 100)] if column in descending_columns else rwg[math.floor(x * 100)]) if str(x) != '' else '')
+
+    stop_timer('color_columns()', start_time) # Stop timer
     return df_new
 
 
 def get_weather():
+    start_time = time.time() # Start timer
+
     html = requests.get('https://www.rotowire.com/baseball/weather.php').text
     soup = BeautifulSoup(html, 'lxml')
 
@@ -273,10 +267,14 @@ def get_weather():
             teams[link['href'].split('=')[1]] = re.search('([^\/]+$)', weather_box_weather.find('img')['src']).group()
     if 'WAS' in teams.keys():
         teams['WSH'] = teams.pop('WAS')
+
+    stop_timer('get_weather()', start_time) # Stop timer
     return teams
 
 
 def batter_vs_pitcher():
+    start_time = time.time() # Start timer
+
     html = requests.get('https://baseballsavant.mlb.com/daily_matchups').text
     data = re.search('(matchups_data\s*=\s*)(\[.*\])', html).group(2)
     df = pd.DataFrame(json.loads(data), columns = ['player_id', 'pitcher_id', 'pa', 'abs', 'hits', 'xba'])
@@ -285,10 +283,14 @@ def batter_vs_pitcher():
     df['H_vs_SP'] = df['hits'].fillna(0).astype(int, errors = 'ignore')
     df['xba'] = df['xba'].fillna(np.nan).astype(float, errors = 'ignore')
     df['xH_vs_SP'] = round(df['xba'] * df['abs'], 2).fillna(np.nan)
+
+    stop_timer('batter_vs_pitcher()', start_time) # Stop timer
     return df[['player_id', 'pitcher_id', 'PA_vs_SP', 'H_vs_SP', 'xH_vs_SP']]
 
 
 def get_lineups(day):
+    start_time = time.time() # Start timer
+
     html = requests.get('https://www.mlb.com/starting-lineups/{}'.format(day.strftime('%Y-%m-%d'))).text
     soup = BeautifulSoup(html, 'lxml')
 
@@ -314,6 +316,8 @@ def get_lineups(day):
                     slot += 1
             else:
                 out_dict[team] = False
+
+    stop_timer('get_lineups()', start_time) # Stop timer
     return out_dict
 
 
@@ -325,3 +329,7 @@ def lineup_func(lineups, player_id, team):
         if lineups[team] == True:
             out = 'OUT'
     return out
+
+
+def stop_timer(function_name, start_time):
+    print('\n', '{} time: {}'.format(function_name, datetime.timedelta(seconds = round(time.time() - start_time))), sep='')

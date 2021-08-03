@@ -10,6 +10,8 @@
       <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.10.23/css/jquery.dataTables.css">
       <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/buttons/1.6.5/css/buttons.dataTables.min.css">
       <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/fixedcolumns/3.3.3/css/fixedColumns.dataTables.min.css">
+      <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.10.25/css/jquery.dataTables.min.css">
+      <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/buttons/1.7.1/css/buttons.dataTables.min.css">
       <style>
          .border_left {
             border-left: 2px solid;
@@ -18,6 +20,8 @@
       <script type="text/javascript" charset="utf8" src="https://code.jquery.com/jquery-3.5.1.js"></script>
       <script type="text/javascript" charset="utf8" src="https://cdn.datatables.net/1.10.23/js/jquery.dataTables.min.js"></script>
       <script type="text/javascript" charset="utf8" src="https://cdn.datatables.net/fixedcolumns/3.3.3/js/dataTables.fixedColumns.min.js"></script>
+      <script type="text/javascript" charset="utf8" src="https://cdn.datatables.net/buttons/1.7.1/js/dataTables.buttons.min.js"></script>
+      <script type="text/javascript" charset="utf8" src="https://cdn.datatables.net/buttons/1.7.1/js/buttons.html5.min.js"></script>
       <script>
 
          $(document).ready(function () {
@@ -156,52 +160,74 @@
                }
             ]
 
-            $('table.display').DataTable({
-               ajax: {
-                  url: '/loadTableData?hitMin=10&days=' + last_x_days
-               },
-               columns: cols,
-               order: [[ 6, 'desc']],
-               scrollX: true,
-               paging: false,
-               scrollY: '75vh',
-               scrollCollapse: true,
-               autoWidth: false,
-               columnDefs: [{
-                  targets: '_all',
-                  defaultContent: ''
-               }],
-               fixedColumns: {
-                  leftColumns: 4
-               },
-               dom: '<"toolbar">frtip',
-               initComplete: function(oSettings, json) {
-                  $('th, td').css('white-space', 'nowrap'); // Don't wrap table headers
-                  $('th, td').css('text-align', 'center'); // Center text
-
-                  var toolbarHtml = '<div style="float: left;">';
-                     toolbarHtml += '   <p>Most recent statcast data: ';
-                     toolbarHtml += '      <span style="color: red;">' + json.lastUpdated + '</span>';
-                     toolbarHtml += '   </p>';
-                     toolbarHtml += '</div>';
-
-                  $('div.toolbar').html(toolbarHtml);
-               },
-               rowCallback: function(row, data, index) {
-                  Object.keys(data).forEach(function(key, colIndex) {
-                     if (data[key + '_color']) {
-                        var colDisplayIndex = cols.findIndex(item => item.data === key);
-                        $(row).find('td:eq(' + colDisplayIndex + ')').css('background-color', data[key + '_color']);
+            var create_table = function() {
+               return $('table.display').DataTable({
+                  ajax: {
+                     url: '/loadTableData?hitMin=10&days=' + last_x_days
+                  },
+                  columns: cols,
+                  order: [[ 6, 'desc']],
+                  scrollX: true,
+                  paging: false,
+                  scrollY: '75vh',
+                  scrollCollapse: true,
+                  autoWidth: false,
+                  columnDefs: [{
+                     targets: '_all',
+                     defaultContent: ''
+                  }],
+                  fixedColumns: {
+                     leftColumns: 4
+                  },
+                  dom: 'Bfrtip',
+                  buttons: [
+                     {
+                        text: 'Refresh',
+                        action: function (e, dt, button, config) {
+                           dt.clear().destroy();
+                           create_table();
+                        }
                      }
-                     if (data['order'].toString() === 'OUT') {
-                        $(row).find('td:eq(3)').css('background-color', 'red');
-                        $(row).find('td:eq(3)').css('color', 'white');
+                  ],
+                  initComplete: function(oSettings, json) {
+                     $('th, td').css('white-space', 'nowrap'); // Don't wrap table headers
+                     $('th, td').css('text-align', 'center'); // Center text
+
+                     var toolbarHtml = '<div style="float: left;">';
+                        toolbarHtml += '   <p>Most recent statcast data: ';
+                        toolbarHtml += '      <span style="color: red;">' + json.lastUpdated + '</span>';
+                        toolbarHtml += '   </p>';
+                        toolbarHtml += '</div>';
+
+                     $('div.toolbar').html(toolbarHtml);
+                  },
+                  rowCallback: function(row, data, index) {
+                     Object.keys(data).forEach(function(key, colIndex) {
+                        if (data[key + '_color']) {
+                           var colDisplayIndex = cols.findIndex(item => item.data === key);
+                           $(row).find('td:eq(' + colDisplayIndex + ')').css('background-color', data[key + '_color']);
+                        }
+                        if (data['order'].toString() === 'OUT') {
+                           $(row).find('td:eq(3)').css('background-color', 'red');
+                           $(row).find('td:eq(3)').css('color', 'white');
+                        }
+                     });
+                  },
+                  infoCallback: function(settings, start, end, max, total, pre) {
+                     var info = '';
+                     if (settings) {
+                        var json = settings.json;
+                        if (json) {
+                           info = 'Most recent statcast data: <span style="color: red;">' + json.lastUpdated + '</span> | Showing ' + max + ' players</div>';
+                        }
                      }
-                  });
-               }
-            })
+                     return info;
+                  }
+               })
+            }
+
+            create_table();
          });
-
       </script>
    </head>
    <div style="margin: 0 auto; width: 200px;">

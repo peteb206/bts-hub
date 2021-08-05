@@ -15,6 +15,12 @@ import re
 
 
 app = Flask(__name__)
+global session, header
+session = requests.Session()
+header = {
+  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.182 Safari/537.36",
+  "X-Requested-With": "XMLHttpRequest"
+}
 
 
 @app.route('/')
@@ -67,6 +73,41 @@ def index():
     out = jsonify({'data': all_df.fillna('').to_dict('records'), 'lastUpdated': last_updated_str})
 
     stop_timer('Total', start_time) # Stop timer
+    return out
+
+
+@app.route("/pickHistory")
+def get_pick_history():
+    start_time = time.time() # Start timer
+
+    start_date_string = request.args.get('start_date')
+    end_date_string = request.args.get('end_date')
+    try:
+       date = datetime.datetime.strptime(start_date_string, '%Y-%m-%d')
+       end_date = datetime.datetime.strptime(end_date_string, '%Y-%m-%d')
+    except:
+        return jsonify({'error': 'Either start_date or end_date is invalid. Dates must be a valid date in yyyy-mm-dd format.', 'start_date': start_date_string, 'end_date': end_date_string})
+
+    okta_uid = os.environ.get('OKTA_UID_PETEB206')
+
+    picks = list()
+    iterate = True
+    while iterate == True:
+        date_string = date.strftime('%Y-%m-%d')
+        url = f'https://fantasy-lookup-service.mlb.com/fantasylookup/rawjson/named.bts_hitdd_picks.bam?ns=mlb&okta_uid={okta_uid}&max_days_back=1&max_days_ahead=13&bts_game_id=12&year=2021&focus_date={date_string}'
+        print(url)
+        full_json = json.loads(session.get(url, headers = header, timeout = 10).text)
+        pick_dates = full_json['pick_dates']
+        for pick_date in pick_dates:
+            for pick in pick_date['picks']:
+                if pick['is_game_locked'] == 'Y':
+                    picks.append({'game_date': pick['game_date'], 'player_id': pick['player_id'], 'name': pick['name_display_first_last'], 'result': pick['score_result_type']})
+        date += datetime.timedelta(days = 15)
+        if date >= end_date:
+            iterate = False
+
+    out = jsonify({'data': picks})
+    stop_timer('get_pick_history', start_time) # Stop timer
     return out
 
 
@@ -182,7 +223,7 @@ def get_opponent_info(statcast_df, today):
 
     matchups = list()
     url = 'https://baseballsavant.mlb.com/schedule?date={}'.format(today.strftime('%Y-%m-%d'))
-    response_json = requests.get(url).json()
+    response_json = session.get(url, headers = header).json()
     response_dict = json.loads(json.dumps(response_json))
     games = response_dict['schedule']['dates'][0]['games']
     for game in games:
@@ -256,7 +297,7 @@ def color_columns(df, min_hits, last_x_days):
 def get_weather():
     start_time = time.time() # Start timer
 
-    html = requests.get('https://www.rotowire.com/baseball/weather.php').text
+    html = session.get('https://www.rotowire.com/baseball/weather.php', headers = header).text
     soup = BeautifulSoup(html, 'lxml')
 
     teams = dict()
@@ -275,7 +316,7 @@ def get_weather():
 def batter_vs_pitcher():
     start_time = time.time() # Start timer
 
-    html = requests.get('https://baseballsavant.mlb.com/daily_matchups').text
+    html = session.get('https://baseballsavant.mlb.com/daily_matchups', headers = header).text
     data = re.search('(matchups_data\s*=\s*)(\[.*\])', html).group(2)
     df = pd.DataFrame(json.loads(data), columns = ['player_id', 'pitcher_id', 'pa', 'abs', 'hits', 'xba'])
     df['PA_vs_SP'] = df['pa'].fillna(0).astype(int, errors = 'ignore')
@@ -291,7 +332,7 @@ def batter_vs_pitcher():
 def get_lineups(day):
     start_time = time.time() # Start timer
 
-    html = requests.get('https://www.mlb.com/starting-lineups/{}'.format(day.strftime('%Y-%m-%d'))).text
+    html = session.get('https://www.mlb.com/starting-lineups/{}'.format(day.strftime('%Y-%m-%d')), headers = header).text
     soup = BeautifulSoup(html, 'lxml')
 
     out_dict = dict()

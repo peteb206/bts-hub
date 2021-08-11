@@ -32,7 +32,7 @@ def home():
 def index():
     start_time = time.time() # Start timer
 
-    last_x_days = int(request.args.get('days'))
+    day_string = request.args.get('day')
     min_hits = int(request.args.get('hitMin'))
 
     today = datetime.datetime.now(tz.gettz('America/Chicago')).date()
@@ -44,13 +44,12 @@ def index():
     general_info_df['batter_handedness'] = np.where(general_info_df['player_id'].duplicated(keep=False), 'B', general_info_df['batter_handedness'])
     general_info_df.drop_duplicates(subset='player_id', inplace=True)
 
-    calculations_df = calculate_hit_pct(statcast_df)
-    x_days_ago = today - datetime.timedelta(days=last_x_days + 1)
-    calculations_df_x_days = calculate_hit_pct(statcast_df, since_date=x_days_ago.strftime('%Y-%m-%d'))
-    calculations_df_x_days.drop('player_name', axis=1, inplace=True)
+    calculations_df = calculate_hit_pct(statcast_df, weighted = False)
+    calculations_df_weighted = calculate_hit_pct(statcast_df, weighted = True)
+    calculations_df_weighted.drop('player_name', axis=1, inplace=True)
 
     calculations_df = pd.merge(general_info_df, calculations_df, how='right', on='player_id')
-    all_df = pd.merge(calculations_df, calculations_df_x_days, how='left', on='player_id', suffixes=('_total', f'_{last_x_days}'))
+    all_df = pd.merge(calculations_df, calculations_df_weighted, how='left', on='player_id', suffixes=('_total', '_weighted'))
     try:
         all_df = pd.merge(all_df, get_opponent_info(statcast_df, today), how='left', left_on='team', right_on='opponent').drop(['game_number', 'opponent'], axis=1).rename({'pitching_team': 'opponent'}, axis=1)
         all_df['opponent'] = np.where(all_df['home_away'] == 'away', all_df['opponent'], '@' + all_df['opponent'])
@@ -65,7 +64,7 @@ def index():
     lineups = get_lineups(today)
     all_df['order'] = all_df.apply(lambda row: lineup_func(lineups, row['player_id'], row['team']), axis = 1)
 
-    all_df = color_columns(all_df[~all_df['opponent'].isnull()], min_hits, last_x_days)
+    all_df = color_columns(all_df[~all_df['opponent'].isnull()], min_hits)
     weather = get_weather()
     all_df['weather'] = all_df['team'].apply(lambda x: weather[x] if x in weather.keys() else '')
 
@@ -80,31 +79,19 @@ def index():
 def get_pick_history():
     start_time = time.time() # Start timer
 
-    start_date_string = request.args.get('start_date')
-    end_date_string = request.args.get('end_date')
-    try:
-       date = datetime.datetime.strptime(start_date_string, '%Y-%m-%d')
-       end_date = datetime.datetime.strptime(end_date_string, '%Y-%m-%d')
-    except:
-        return jsonify({'error': 'Either start_date or end_date is invalid. Dates must be a valid date in yyyy-mm-dd format.', 'start_date': start_date_string, 'end_date': end_date_string})
-
-    okta_uid = os.environ.get('OKTA_UID_PETEB206')
+    accounts = ['peteb206', 'pberryman6']
 
     picks = list()
-    iterate = True
-    while iterate == True:
-        date_string = date.strftime('%Y-%m-%d')
-        url = f'https://fantasy-lookup-service.mlb.com/fantasylookup/rawjson/named.bts_hitdd_picks.bam?ns=mlb&okta_uid={okta_uid}&max_days_back=1&max_days_ahead=13&bts_game_id=12&year=2021&focus_date={date_string}'
-        print(url)
+    for account in accounts:
+        okta_uid = os.environ.get('OKTA_UID_{}'.format(account.upper()))
+        url = f'https://fantasy-lookup-service.mlb.com/fantasylookup/json/named.bts_profile_cmpsd.bam?bts_game_id=12&bts_user_recent_results.maxRows=200&timeframe=365&fntsy_game_id=10&bts_mulligan_status.game_id=bts2021&okta_uid={okta_uid}'
         full_json = json.loads(session.get(url, headers = header, timeout = 10).text)
-        pick_dates = full_json['pick_dates']
-        for pick_date in pick_dates:
-            for pick in pick_date['picks']:
-                if pick['is_game_locked'] == 'Y':
-                    picks.append({'game_date': pick['game_date'], 'player_id': pick['player_id'], 'name': pick['name_display_first_last'], 'result': pick['score_result_type']})
-        date += datetime.timedelta(days = 15)
-        if date >= end_date:
-            iterate = False
+        pick_history = full_json['bts_profile_cmpsd']['bts_user_recent_results']['queryResults']['row']
+        pick_history_df = pd.DataFrame(pick_history)
+        pick_history_df['game_date'] = pick_history_df['game_date'].apply(lambda x: x.split('T')[0])
+        pick_history_df['account'] = account
+        pick_history_df.rename({'name_display_first_last': 'name'}, axis = 1, inplace = True)
+        picks += pick_history_df.to_dict('records')
 
     out = jsonify({'data': picks})
     stop_timer('get_pick_history', start_time) # Stop timer
@@ -195,12 +182,11 @@ def get_statcast_data(today):
     return df, df['game_date'].values[-1]
 
 
-def calculate_hit_pct(statcast_df, since_date=None):
+def calculate_hit_pct(statcast_df, weighted = False):
     start_time = time.time() # Start timer
 
     keep_cols = ['player_name']
-    if since_date != None:
-        statcast_df = statcast_df[statcast_df['game_date'] >= since_date]
+
     df_by_game = statcast_df.groupby(['game_pk', 'statcast', 'batter'] + keep_cols)[['hit', 'xBA']].sum().reset_index().rename({'hit': 'H', 'xBA': 'xH'}, axis=1)
     df_by_game['H_1+'] = (df_by_game['H'] >= 1).astype(int)
     df_by_game['G'] = 1
@@ -269,11 +255,11 @@ def get_pitcher_stats(df, since_date=None):
         return np.nan, np.nan
 
 
-def color_columns(df, min_hits, last_x_days):
+def color_columns(df, min_hits):
     start_time = time.time() # Start timer
 
     df_new = df.copy()
-    df_new = df_new[(df_new['H_total'] >= min_hits) & (df_new['H_{}'.format(last_x_days)] >= 1)]
+    df_new = df_new[df_new['H_total'] >= min_hits]
     rwg = ['#F8696B', '#F86B6D', '#F86E70', '#F87173', '#F87476', '#F87779', '#F87A7C', '#F87D7F', '#F88082', '#F88385', '#F88688', '#F8898B', '#F88C8E', '#F98F91', '#F99294', '#F99597', '#F9989A', '#F99A9D', '#F99DA0', '#F9A0A3', '#F9A3A6', '#F9A6A9', '#F9A9AC', '#F9ACAF', '#F9AFB2', '#FAB2B5', '#FAB5B7', '#FAB8BA', '#FABBBD', '#FABEC0', '#FAC1C3', '#FAC4C6', '#FAC7C9', '#FACACC', '#FACCCF', '#FACFD2', '#FAD2D5', '#FAD5D8', '#FBD8DB', '#FBDBDE', '#FBDEE1', '#FBE1E4', '#FBE4E7', '#FBE7EA', '#FBEAED', '#FBEDF0', '#FBF0F3', '#FBF3F6', '#FBF6F9', '#FBF9FC', '#FCFCFF', '#F9FBFD', '#F6FAFA', '#F3F9F8', '#F0F8F5', '#EDF6F2', '#EAF5F0', '#E7F4ED', '#E4F3EA', '#E1F1E8', '#DEF0E5', '#DBEFE2', '#D8EEE0', '#D5ECDD', '#D2EBDB', '#CFEAD8', '#CCE9D5', '#C8E7D3', '#C5E6D0', '#C2E5CD', '#BFE4CB', '#BCE2C8', '#B9E1C5', '#B6E0C3', '#B3DFC0', '#B0DDBD', '#ADDCBB', '#AADBB8', '#A7DAB6', '#A4D9B3', '#A1D7B0', '#9ED6AE', '#9BD5AB', '#98D4A8', '#94D2A6', '#91D1A3', '#8ED0A0', '#8BCF9E', '#88CD9B', '#85CC99', '#82CB96', '#7FCA93', '#7CC891', '#79C78E', '#76C68B', '#73C589', '#70C386', '#6DC283', '#6AC181', '#67C07E', '#63BE7B']
     gwr = rwg[::-1]
 
@@ -281,7 +267,7 @@ def color_columns(df, min_hits, last_x_days):
     percentile_columns_exact = ['H_vs_SP', 'xH_vs_SP']
     percentile_columns_all = list()
     for prefix in percentile_columns_prefix:
-        for suffix in ['total', str(last_x_days)]:
+        for suffix in ['total', 'weighted']:
             percentile_columns_all.append(prefix + '_' + suffix)
     percentile_columns_all += percentile_columns_exact
     descending_columns = []

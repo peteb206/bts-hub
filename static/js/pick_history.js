@@ -33,7 +33,7 @@ $(document).ready(function () {
             data: 'status',
             title: 'Result',
             render: function(data, type, row) {
-               return (data === 'SUCCESS') ? 'Success' : (data === 'FAIL') ? 'Fail' : 'In Progress';
+               return (data === '') ? 'In Progress' : data.charAt(0).toUpperCase() + data.substr(1).toLowerCase();
             }
          }, {
             data: 'streak',
@@ -55,6 +55,14 @@ $(document).ready(function () {
                $('#advisorDiv').show();
             }
          }
-      ]
+      ],
+      initComplete: function(oSettings, json) {
+         var th = $('#historyDiv').find('th');
+         var td = $('#historyDiv').find('td');
+         th.css('white-space', 'nowrap'); // Don't wrap table headers
+         td.css('white-space', 'nowrap'); // Don't wrap table data
+         th.css('text-align', 'center'); // Center text
+         td.css('text-align', 'center'); // Center text
+      }
    });
 });

@@ -170,16 +170,21 @@ $(document).ready(function () {
             }
          ],
          initComplete: function(oSettings, json) {
-            $('th, td').css('white-space', 'nowrap'); // Don't wrap table headers
-            $('th, td').css('text-align', 'center'); // Center text
+            var th = $('#advisorDiv').find('th');
+            var td = $('#advisorDiv').find('td');
+            th.css('white-space', 'nowrap'); // Don't wrap table headers
+            td.css('white-space', 'nowrap'); // Don't wrap table data
+            th.css('text-align', 'center'); // Center text
+            td.css('text-align', 'center'); // Center text
 
-            var toolbarHtml = '<div style="float: left;">';
-               toolbarHtml += '   <p>Most recent statcast data: ';
-               toolbarHtml += '      <span style="color: red;">' + json.lastUpdated + '</span>';
-               toolbarHtml += '   </p>';
-               toolbarHtml += '</div>';
+            var toolbarHtml = '';
+            toolbarHtml += '<div style="float: left;">';
+            toolbarHtml += '   <p>Most recent statcast data: ';
+            toolbarHtml += '      <span style="color: red;">' + json.lastUpdated + '</span>';
+            toolbarHtml += '   </p>';
+            toolbarHtml += '</div>';
 
-            $('#advisorDiv.toolbar').html(toolbarHtml);
+            $('#advisorDiv').find('toolbar').html(toolbarHtml);
          },
          rowCallback: function(row, data, index) {
             Object.keys(data).forEach(function(key, colIndex) {
@@ -199,7 +204,7 @@ $(document).ready(function () {
                var json = settings.json;
                if (json) { // Add footnote to table
                   var spacer = ' '.repeat(10) + '|' + ' '.repeat(10); 
-                  info = 'Most recent statcast data: <span style="color: red;">' + json.lastUpdated + '</span>' + spacer + 'Showing ' + max + ' players' + spacer + '* Indicates weighted to favor recent games';
+                  info = 'Most recent statcast data: <span style="color: red;">' + json.lastUpdated + '</span>' + spacer + 'Showing ' + max + ' players' + spacer + '* Indicates each game weighted 10% more than the previous one to account for adjustments, streaks, slumps, etc.';
                }
             }
             return info;

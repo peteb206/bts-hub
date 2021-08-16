@@ -187,7 +187,7 @@ def calculate_hit_pct(statcast_df, weighted = False):
 
     keep_cols = ['player_name']
 
-    df_by_game = statcast_df.groupby(['game_pk', 'statcast', 'batter'] + keep_cols)[['hit', 'xBA']].sum().reset_index().rename({'hit': 'H', 'xBA': 'xH'}, axis=1)
+    df_by_game = statcast_df.groupby(['game_date', 'game_pk', 'statcast', 'batter'] + keep_cols)[['hit', 'xBA']].sum().reset_index().rename({'hit': 'H', 'xBA': 'xH'}, axis=1)
     df_by_game['H_1+'] = (df_by_game['H'] >= 1).astype(int)
     df_by_game['G'] = 1
     df_by_game['xH_1+'] = (df_by_game[df_by_game['statcast'] == True]['xH'] >= 1).astype(int)
@@ -196,7 +196,9 @@ def calculate_hit_pct(statcast_df, weighted = False):
     df_by_game['player_id'] = df_by_game['batter']
     keep_cols = ['player_id'] + keep_cols
 
-    df_by_season = df_by_game.groupby(keep_cols).agg({'H': 'sum', 'xH': 'mean', 'G': 'sum', 'H_1+': 'sum', 'xH_1+': 'sum', 'statcast_G': 'sum'}).reset_index().rename({'batter': 'G', 'xH': 'xH_per_G'}, axis=1)
+    agg_func_sum = weighted_sum if weighted == True else 'sum'
+    agg_func_avg = weighted_avg if weighted == True else 'mean'
+    df_by_season = df_by_game.groupby(keep_cols).agg({'H': 'sum', 'xH': agg_func_avg, 'G': 'sum', 'H_1+': agg_func_sum, 'xH_1+': agg_func_sum, 'statcast_G': 'sum'}).reset_index().rename({'batter': 'G', 'xH': 'xH_per_G'}, axis=1)
     df_by_season['hit_pct'] = df_by_season['H_1+'] / df_by_season['G']
     df_by_season['x_hit_pct'] = df_by_season['xH_1+'] / df_by_season['statcast_G']
 
@@ -356,6 +358,29 @@ def lineup_func(lineups, player_id, team):
         if lineups[team] == True:
             out = 'OUT'
     return out
+
+
+def weighted_avg(s):
+    return np.average(s, weights = calculate_weights(s)) if len(s) > 0 else 0
+
+
+def weighted_sum(s):
+    s2 = s.dropna()
+    out = 0
+    if len(s2) > 0:
+        weights = calculate_weights(s2)
+        out =  np.dot(s2, weights) / np.mean(weights)
+    return out
+
+
+def calculate_weights(s):
+    weights = list()
+    for i in range(len(s)):
+        if i == 0:
+            weights.append(1)
+        else:
+            weights.append(weights[-1] * 1.1)
+    return weights
 
 
 def stop_timer(function_name, start_time):

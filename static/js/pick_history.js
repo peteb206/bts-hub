@@ -25,10 +25,10 @@ $(document).ready(function () {
             title: 'Opponent'
          }, {
             data: 'ab',
-            title: 'AB'
+            title: 'At Bats'
          }, {
             data: 'hit',
-            title: 'H'
+            title: 'Hits'
          }, {
             data: 'status',
             title: 'Result',

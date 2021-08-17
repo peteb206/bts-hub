@@ -28,7 +28,7 @@ def home():
     return render_template('index.html')
 
 
-@app.route("/loadTableData")
+@app.route('/loadTableData')
 def index():
     start_time = time.time() # Start timer
 
@@ -75,7 +75,7 @@ def index():
     return out
 
 
-@app.route("/pickHistory")
+@app.route('/pickHistory')
 def get_pick_history():
     start_time = time.time() # Start timer
 
@@ -97,9 +97,11 @@ def get_pick_history():
     stop_timer('get_pick_history', start_time) # Stop timer
     return out
 
-
+@app.route('/scrapeStatcast')
 def get_statcast_data(today):
     start_time = time.time() # Start timer
+
+    today = datetime.datetime.now(tz.gettz('America/Chicago')).date()
 
     client = pymongo.MongoClient(os.environ.get('DATABASE_CLIENT'))
     database = client[os.environ.get('DATABASE_NAME')]
@@ -348,6 +350,54 @@ def get_lineups(day):
 
     stop_timer('get_lineups()', start_time) # Stop timer
     return out_dict
+
+def get_player_info(year):
+    # Ex. get_player_info(2021)
+    # returns df with the following columns: id, fullName, B, T
+    start_time = time.time() # Start timer
+
+    player_df1 = pd.read_json(f'https://statsapi.mlb.com/api/v1/sports/1/players?season={year}')
+    player_df2 = pd.json_normalize(player_df1['people'])[['id', 'fullName', 'batSide.code', 'pitchHand.code']]
+
+    stop_timer('get_player_info()', start_time) # Stop timer
+    return player_df2.rename({'batSide.code': 'B', 'pitchHand.code': 'T'}, axis=1)
+
+
+def get_schedule(year, date=None):
+    # Ex. get_schedule(2021)
+    # returns df with the following columns: gamePk, gameDate, gameTime, away, home, awayStarterId, homeStarterId, awayLineup, homeLineup
+    start_time = time.time() # Start timer
+
+    date_filter = '' if date == None else '&date={}'.format(datetime.date.strftime(date, '%m/%d/%Y'))
+    schedule_url = f'https://statsapi.mlb.com/api/v1/schedule?lang=en&sportId=1&season={year}{date_filter}&gameType=R&hydrate=probablePitcher,lineups'
+        
+    schedule_df1 = pd.read_json(schedule_url)
+    schedule_df2 = pd.json_normalize(schedule_df1['dates'])[['date', 'games']]
+    schedule_df3 = schedule_df2.explode('games')
+    team_matchups_df = pd.json_normalize(schedule_df3['games'])[['gamePk', 'gameDate', 'teams.away.team.id', 'teams.home.team.id', 'teams.away.probablePitcher.id', 'teams.home.probablePitcher.id', 'lineups.awayPlayers', 'lineups.homePlayers']]
+    team_matchups_df['gameDate'], team_matchups_df['gameTime'] = utc_to_central(team_matchups_df['gameDate'])
+    team_matchups_df.rename({'teams.away.team.id': 'awayId', 'teams.home.team.id': 'homeId', 'teams.away.probablePitcher.id': 'awayStarterId', 'teams.home.probablePitcher.id': 'homeStarterId', 'lineups.awayPlayers': 'awayLineup', 'lineups.homePlayers': 'homeLineup'}, axis=1, inplace=True)
+
+    teams_df1 = pd.read_json(f'https://statsapi.mlb.com/api/v1/teams?lang=en&sportId=1&season={year}')
+    teams_id_map_df = pd.json_normalize(teams_df1['teams'])[['id', 'abbreviation']].set_index('id')
+    teams_id_map = teams_id_map_df['abbreviation'].to_dict()
+    for side in ['away', 'home']:
+        team_matchups_df[side] = team_matchups_df[f'{side}Id'].apply(lambda teamId: teams_id_map[teamId])
+        team_matchups_df[f'{side}StarterId'] = team_matchups_df[f'{side}StarterId'].fillna(0).astype(int)
+        team_matchups_df[f'{side}Lineup'] = team_matchups_df[f'{side}Lineup'].fillna('').apply(lambda lineup: [batter['id'] for batter in lineup])
+
+    get_schedule('batter_vs_pitcher()', start_time) # Stop timer
+    return team_matchups_df.drop(['awayId', 'homeId'], axis=1)
+
+
+def utc_to_central(time_string_series):
+    # Ex. utc_to_central(pd.Series(['2021-04-01T17:05:00Z', '2021-04-01T17:05:10Z']))
+    # returns 2 series
+    game_time_utc = time_string_series.apply(lambda x: datetime.datetime.strptime(x, '%Y-%m-%dT%H:%M:%SZ').replace(tzinfo=tz.gettz('UTC')))
+    game_time_current_time_zone = game_time_utc.apply(lambda x: x.astimezone(tz.gettz('America/Chicago')))
+    game_date_current_time_zone_str = game_time_current_time_zone.apply(lambda x: x.strftime('%Y-%m-%d'))
+    game_time_current_time_zone_str = game_time_current_time_zone.apply(lambda x: x.strftime('%I:%M %p %Z'))
+    return game_date_current_time_zone_str, game_time_current_time_zone_str
 
 
 def lineup_func(lineups, player_id, team):

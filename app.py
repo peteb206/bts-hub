@@ -36,7 +36,7 @@ def index():
     min_hits = int(request.args.get('hitMin'))
 
     today = datetime.datetime.now(tz.gettz('America/Chicago')).date()
-    statcast_data = get_statcast_data(today)
+    statcast_data = get_statcast_data()
     statcast_df = statcast_data[0]
     last_date = statcast_data[1]
 
@@ -98,7 +98,7 @@ def get_pick_history():
     return out
 
 @app.route('/scrapeStatcast')
-def get_statcast_data(today):
+def get_statcast_data():
     start_time = time.time() # Start timer
 
     today = datetime.datetime.now(tz.gettz('America/Chicago')).date()

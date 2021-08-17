@@ -36,7 +36,7 @@ def index():
     min_hits = int(request.args.get('hitMin'))
 
     today = datetime.datetime.now(tz.gettz('America/Chicago')).date()
-    statcast_data = get_statcast_data()
+    statcast_data = read_database()
     statcast_df = statcast_data[0]
     last_date = statcast_data[1]
 
@@ -103,10 +103,6 @@ def get_statcast_data():
 
     today = datetime.datetime.now(tz.gettz('America/Chicago')).date()
 
-    client = pymongo.MongoClient(os.environ.get('DATABASE_CLIENT'))
-    database = client[os.environ.get('DATABASE_NAME')]
-    collection = database[os.environ.get('DATABASE_COLLECTION')]
-
     this_year = today.year
 
     start_date = datetime.date(this_year, 1, 1)
@@ -114,7 +110,7 @@ def get_statcast_data():
     savant_scrape_date_offset_minus_1, savant_scrape_date_offset = datetime.timedelta(days=savant_scrape_days_span - 1), datetime.timedelta(days=savant_scrape_days_span)
 
     df_list = list()
-    existing_data_df = pd.DataFrame(collection.find())
+    existing_data_df = read_database()
 
     last_date = None
     if len(existing_data_df.index) > 0:
@@ -180,7 +176,20 @@ def get_statcast_data():
     if len(out_dict) > 0: 
         collection.insert_many(out_dict)
 
+    out = jsonify({'mostRecentStatcastDara': df['game_date'].values[-1]})
     stop_timer('get_statcast_data()', start_time) # Stop timer
+    return out 
+
+
+def read_database():
+    start_time = time.time() # Start timer
+
+    client = pymongo.MongoClient(os.environ.get('DATABASE_CLIENT'))
+    database = client[os.environ.get('DATABASE_NAME')]
+    collection = database[os.environ.get('DATABASE_COLLECTION')]
+    df = pd.DataFrame(collection.find())
+
+    stop_timer('read_database()', start_time) # Stop timer
     return df, df['game_date'].values[-1]
 
 

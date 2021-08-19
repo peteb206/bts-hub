@@ -36,9 +36,9 @@ def index():
     min_hits = int(request.args.get('hitMin'))
 
     today = datetime.datetime.now(tz.gettz('America/Chicago')).date()
-    statcast_data = read_database()
-    statcast_df = statcast_data[0]
-    last_date = statcast_data[1]
+    collection = read_database()
+    statcast_df = pd.DataFrame(collection.find())
+    last_date = statcast_df['game_date'].values[-1]
 
     general_info_df = statcast_df.drop_duplicates(subset=['batter', 'batter_handedness'], keep='last').rename({'batter': 'player_id'}, axis=1)[['player_id', 'team', 'batter_handedness']]
     general_info_df['batter_handedness'] = np.where(general_info_df['player_id'].duplicated(keep=False), 'B', general_info_df['batter_handedness'])
@@ -110,7 +110,8 @@ def get_statcast_data():
     savant_scrape_date_offset_minus_1, savant_scrape_date_offset = datetime.timedelta(days=savant_scrape_days_span - 1), datetime.timedelta(days=savant_scrape_days_span)
 
     df_list = list()
-    existing_data_df = read_database()
+    collection = read_database()
+    existing_data_df = pd.DataFrame(collection.find())
 
     last_date = None
     if len(existing_data_df.index) > 0:
@@ -187,10 +188,9 @@ def read_database():
     client = pymongo.MongoClient(os.environ.get('DATABASE_CLIENT'))
     database = client[os.environ.get('DATABASE_NAME')]
     collection = database[os.environ.get('DATABASE_COLLECTION')]
-    df = pd.DataFrame(collection.find())
 
     stop_timer('read_database()', start_time) # Stop timer
-    return df, df['game_date'].values[-1]
+    return collection
 
 
 def calculate_hit_pct(statcast_df, weighted = False):

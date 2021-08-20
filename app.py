@@ -47,8 +47,11 @@ def index():
     calculations_df = calculate_hit_pct(statcast_df, weighted = False)
     calculations_df_weighted = calculate_hit_pct(statcast_df, weighted = True)
     calculations_df_weighted.drop('player_name', axis=1, inplace=True)
+    calculate_per_pa_dfs = calculate_hit_per_pa(statcast_df)
 
     calculations_df = pd.merge(general_info_df, calculations_df, how='right', on='player_id')
+    calculations_df = pd.merge(calculate_per_pa_dfs[0], calculations_df, how='right', on='player_id').rename({'L': 'H_per_PA_vs_L', 'R': 'H_per_PA_vs_R'}, axis=1)
+    calculations_df = pd.merge(calculate_per_pa_dfs[1], calculations_df, how='right', on='player_id').rename({'H_per_PA': 'H_per_PA_vs_BP'}, axis=1)
     all_df = pd.merge(calculations_df, calculations_df_weighted, how='left', on='player_id', suffixes=('_total', '_weighted'))
     try:
         all_df = pd.merge(all_df, get_opponent_info(statcast_df, today), how='left', left_on='team', right_on='opponent').drop(['game_number', 'opponent'], axis=1).rename({'pitching_team': 'opponent'}, axis=1)
@@ -60,6 +63,7 @@ def index():
 
     head_to_head = batter_vs_pitcher()
     all_df = pd.merge(all_df, head_to_head, how='left', on=['player_id', 'pitcher_id'])
+    all_df = pd.merge(calculate_per_pa_dfs[2], all_df, how='right', on='pitcher_id').rename({'L': 'H_per_BF_vs_L', 'R': 'H_per_BF_vs_R'}, axis=1)
 
     lineups = get_lineups(today)
     all_df['order'] = all_df.apply(lambda row: lineup_func(lineups, row['player_id'], row['team']), axis = 1)
@@ -217,6 +221,19 @@ def calculate_hit_pct(statcast_df, weighted = False):
     return df_by_season.drop(['H_1+', 'xH_1+', 'statcast_G'], axis=1)
 
 
+def calculate_hit_per_pa(statcast_df):
+    start_time = time.time() # Start timer
+
+    batter_vs_pitcher_hand_df = statcast_df.pivot_table(values='hit', index='batter', columns='pitcher_handedness').reset_index().rename({'batter': 'player_id'}, axis=1)
+
+    batter_vs_relievers_df = statcast_df[statcast_df['starter_flg'] == False].groupby('batter')['hit'].mean().reset_index().rename({'batter': 'player_id', 'hit': 'H_per_PA'}, axis=1).sort_values(by='H_per_PA', ascending=False)
+
+    pitcher_vs_batter_hand_df = statcast_df.pivot_table(values='hit', index='pitcher', columns='batter_handedness').reset_index().rename({'pitcher': 'pitcher_id'}, axis=1)
+
+    stop_timer('calculate_hit_per_pa()', start_time) # Stop timer
+    return batter_vs_pitcher_hand_df, batter_vs_relievers_df, pitcher_vs_batter_hand_df
+
+
 def get_opponent_info(statcast_df, today):
     start_time = time.time() # Start timer
 
@@ -277,7 +294,7 @@ def color_columns(df, min_hits):
     gwr = rwg[::-1]
 
     percentile_columns_prefix = ['H', 'xH_per_G', 'hit_pct', 'x_hit_pct', 'sp_HA_per_BF', 'sp_xHA_per_BF', 'bp_HA_per_BF', 'bp_xHA_per_BF']
-    percentile_columns_exact = ['H_vs_SP', 'xH_vs_SP']
+    percentile_columns_exact = ['H_vs_SP', 'xH_vs_SP', 'H_per_PA_vs_L', 'H_per_PA_vs_R', 'H_per_PA_vs_BP', 'H_per_BF_vs_L', 'H_per_BF_vs_R']
     percentile_columns_all = list()
     for prefix in percentile_columns_prefix:
         for suffix in ['total', 'weighted']:

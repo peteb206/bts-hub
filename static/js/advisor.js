@@ -9,12 +9,20 @@ $(document).ready(function () {
       }
    }
 
-   var roundFunc = function (data, type, row) {
+   var roundFunc = function (data, digits) {
       if (data === '' || data === undefined) {
          return data;
       } else {
-         return data.toFixed(2).toString();
+         return data.toFixed(digits).toString();
       }
+   }
+
+   var roundFunc2 = function (data, type, row) {
+      return roundFunc(data, 2)
+   }
+
+   var roundFunc3 = function (data, type, row) {
+      return roundFunc(data, 3)
    }
 
    var playerLinkFunc = function(id, name) {
@@ -65,7 +73,7 @@ $(document).ready(function () {
       }, {
          data: 'xH_per_G_total',
          title: 'xH / G',
-         render: roundFunc
+         render: roundFunc2
       }, {
          data: 'hit_pct_total',
          title: 'Hit %',
@@ -75,13 +83,22 @@ $(document).ready(function () {
          title: 'xHit %',
          render: percentFunc
       }, {
-         data: 'H_weighted',
-         title: 'H*',
-         className: 'border_left'
+         data: 'H_per_PA_vs_L',
+         title: 'H / PA (vs. L)',
+         render: roundFunc3
+      }, {
+         data: 'H_per_PA_vs_R',
+         title: 'H / PA (vs. R)',
+         render: roundFunc3
+      }, {
+         data: 'H_per_PA_vs_BP',
+         title: 'H / PA (vs. BP)',
+         render: roundFunc3
       }, {
          data: 'xH_per_G_weighted',
          title: 'xH / G*',
-         render: roundFunc
+         render: roundFunc2,
+         className: 'border_left'
       }, {
          data: 'hit_pct_weighted',
          title: 'Hit %*',
@@ -105,6 +122,14 @@ $(document).ready(function () {
       }, {
          data: 'sp_xHA_per_BF_total',
          title: 'SP: xH / BF'
+      }, {
+         data: 'H_per_BF_vs_L',
+         title: 'SP: H / BF (vs. L)',
+         render: roundFunc3
+      }, {
+         data: 'H_per_BF_vs_R',
+         title: 'SP: H / BF (vs. R)',
+         render: roundFunc3
       }, {
          data: 'bp_HA_per_BF_total',
          title: 'RP: H / BF'
@@ -133,6 +158,7 @@ $(document).ready(function () {
    var month = String(date.getMonth() + 1).padStart(2, '0');
    var year = date.getFullYear();
    var yyyy_mm_dd = [year, month, day].join('-');
+   $('#title').html('Beat the Streak Advisor: ' + yyyy_mm_dd);
 
    var create_table = function() {
       return $('table.display#advisor').DataTable({
@@ -155,13 +181,8 @@ $(document).ready(function () {
          },
          dom: 'Bfrtip',
          buttons: [
+            'csv',
             {
-               text: 'Refresh',
-               action: function (e, dt, button, config) {
-                  dt.clear().destroy();
-                  create_table();
-               }
-            }, {
                text: 'Pick History',
                action: function (e, dt, button, config) {
                   $('#advisorDiv').hide();

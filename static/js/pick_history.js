@@ -1,5 +1,5 @@
 $(document).ready(function () {
-   var table = $('table.display#history').DataTable({
+   $('table.display#history').DataTable({
       ajax: {
          url: '/pickHistory'
       },
@@ -16,7 +16,7 @@ $(document).ready(function () {
             render: function(data, type, row) {
                var out = data;
                if (row.player_id) {
-                  out = '<a href="https://www.mlb.com/player/' + row.player_id + '" target="_blank" style="text-decoration:none; color:#0076CE">' + data + '</a>';
+                  out = '<a class="player" href="https://www.mlb.com/player/' + row.player_id + '" target="_blank" style="text-decoration:none; color:#0076CE">' + data + '</a>';
                }
                return out;
             }
@@ -40,14 +40,15 @@ $(document).ready(function () {
             title: 'Streak'
          }
       ],
-      order: [[ 0, 'asc'], [ 1, 'desc']],
-      paging: false,
-      scrollX: true,
-      scrollY: '75vh',
-      scrollCollapse: true,
-      autoWidth: false,
+      order: [[1, 'desc'], [0, 'asc']],
+      // paging: false,
+      // scrollX: true,
+      // scrollY: '75vh',
+      // scrollCollapse: true,
+      // autoWidth: false,
       dom: 'Bfrtip',
       buttons: [
+         'pageLength',
          {
             text: 'Advisor',
             action: function (e, dt, button, config) {
@@ -55,14 +56,6 @@ $(document).ready(function () {
                $('#advisorDiv').show();
             }
          }
-      ],
-      initComplete: function(oSettings, json) {
-         var th = $('#historyDiv').find('th');
-         var td = $('#historyDiv').find('td');
-         th.css('white-space', 'nowrap'); // Don't wrap table headers
-         td.css('white-space', 'nowrap'); // Don't wrap table data
-         th.css('text-align', 'center'); // Center text
-         td.css('text-align', 'center'); // Center text
-      }
+      ]
    });
 });

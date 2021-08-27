@@ -368,7 +368,7 @@ def get_player_info(year=2021, hitters=True, pitchers=True):
         player_df2 = player_df2[player_df2['primaryPosition.code'] == '1']
     if pitchers == False:
         player_df2 = player_df2[player_df2['primaryPosition.code'] != '1']
-    player_df3 = player_df2.rename({'fullName': 'name', 'batSide.code': 'B', 'pitchHand.code': 'T'}, axis=1)[['id', 'name', 'currentTeam.id', 'B', 'T']]
+    player_df3 = player_df2.rename({'fullName': 'name', 'primaryPosition.abbreviation': 'position', 'batSide.code': 'B', 'pitchHand.code': 'T'}, axis=1)[['id', 'name', 'position', 'currentTeam.id', 'B', 'T']]
 
     teams_url = f'https://statsapi.mlb.com/api/v1/teams?lang=en&sportId=1&season={year}'
     teams_df1 = pd.read_json(teams_url)
@@ -475,7 +475,7 @@ def calculate_weights(s):
 
 
 def get_hit_probability(calculations_df, player_info_df, todays_games_df):
-    df = pd.merge(calculations_df, player_info_df, how='left', left_on='batter', right_on='id').drop(['id', 'T'], axis=1)
+    df = pd.merge(calculations_df, player_info_df[(player_info_df['position'] != 'P') | (player_info_df['name'] == 'Shohei Ohtani')], left_on='batter', right_on='id').drop(['id', 'T'], axis=1)
     df = pd.merge(df, todays_games_df.melt(id_vars='game_pk', value_vars=['away_team', 'home_team'], value_name='team').drop('variable', axis=1), on='team')
     df['probability'] = np.random.uniform(0, 1, df.shape[0]).round(4)
     return df

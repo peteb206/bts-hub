@@ -77,8 +77,9 @@ $(document).ready(function () {
                      title: 'Lineup',
                      render: function (data, type, row) {
                         var game = ajax_data.games[row.game_pk];
+                        var metrics = ajax_data.metrics[row.batter]
                         var lineup = [];
-                        if (ajax_data.metrics[row.batter].team == game.away_team && game.away_lineup !== undefined) {
+                        if (metrics.team == game.away_team && game.away_lineup !== undefined) {
                            lineup = game.away_lineup;
                         } else if (game.home_lineup !== undefined) {
                            lineup = game.home_lineup;
@@ -86,6 +87,8 @@ $(document).ready(function () {
                         var order = 'TBD';
                         if (lineup.length > 0) {
                            order = lineup.indexOf(row.batter) + 1;
+                        } else if (metrics.order_total) {
+                           order += ' (' + metrics.order_total.toFixed(1) + ')';
                         }
                         return (order === 0 ? 'OUT' : order);
                      }

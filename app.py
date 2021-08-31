@@ -54,8 +54,8 @@ def index():
     last_updated = statcast_df['game_date'].values[-1]
 
     calculations_df = pd.merge(calculate_hit_pct(statcast_df, weighted = False), calculate_hit_pct(statcast_df, weighted = True), on='batter', suffixes=('_total', '_weighted'))
-    calculate_per_pa_dfs = calculate_hit_per_pa(statcast_df)
 
+    calculate_per_pa_dfs = calculate_hit_per_pa(statcast_df)
     calculations_df = pd.merge(calculate_per_pa_dfs[0], calculations_df, how='right', on='batter').rename({'L': 'H_per_PA_vs_L', 'R': 'H_per_PA_vs_R'}, axis=1)
     calculations_df = pd.merge(calculate_per_pa_dfs[1], calculations_df, how='right', on='batter').rename({'H_per_PA': 'H_per_PA_vs_BP'}, axis=1)
 
@@ -98,7 +98,8 @@ def get_statcast_events(this_years_games_df):
         }
     ))
 
-    out = pd.DataFrame(entries)
+    out = pd.DataFrame.from_records(entries)
+
     stop_timer('get_statcast_events()', start_time) # Stop timer
     return out
 
@@ -191,14 +192,14 @@ def get_statcast_data():
 
     df = pd.concat(df_list, ignore_index=True)
 
-    out_dict = pd.concat([existing_data_df, df], ignore_index=True).drop_duplicates(subset='_id', keep=False).to_dict('records') # drop duplicate events
-    if len(out_dict) > 0:
-        print('Adding {} plate appearances to the database'.format(len(out_dict)), '\n')
-        collection.insert_many(out_dict)
+    new_entries_df = pd.concat([existing_data_df, df], ignore_index=True).drop_duplicates(subset='_id', keep=False) # drop duplicate events
+    print('Adding {} plate appearances to the database'.format(len(new_entries_df.index)), '\n')
+    if len(new_entries_df.index) > 0:
+        collection.insert_many(new_entries_df.to_dict('records'))
 
     out = jsonify({'mostRecentStatcastData': last_date})
     stop_timer('get_statcast_data()', start_time) # Stop timer
-    return out 
+    return out
 
 
 def read_database():
@@ -214,6 +215,10 @@ def read_database():
 
 def enrich_data(df, schedule_df, player_info_df, today_str):
     start_time = time.time() # Start timer
+
+    # Calculate batting order
+    df['order'] = df['order'] = df.groupby(['game_pk', 'home'])['batter'].cumcount() + 1
+    df['order'] = np.where(df['order'] < 10, df['order'], np.nan)
 
     df['statcast'] = df.groupby('game_pk')['xBA'].transform('sum') > 0
 
@@ -234,7 +239,7 @@ def is_hit(event):
 def calculate_hit_pct(statcast_df, weighted = False):
     start_time = time.time() # Start timer
 
-    df_by_game = statcast_df.groupby(['game_date', 'game_pk', 'statcast', 'batter'])[['hit', 'xBA']].sum().reset_index().rename({'hit': 'H', 'xBA': 'xH'}, axis=1)
+    df_by_game = statcast_df.groupby(['game_date', 'game_pk', 'statcast', 'batter', 'order'])[['hit', 'xBA']].sum().reset_index().rename({'hit': 'H', 'xBA': 'xH'}, axis=1)
     df_by_game['H_1+'] = (df_by_game['H'] >= 1).astype(int)
     df_by_game['G'] = 1
     df_by_game['xH_1+'] = (df_by_game[df_by_game['statcast'] == True]['xH'] >= 1).astype(int)
@@ -242,7 +247,7 @@ def calculate_hit_pct(statcast_df, weighted = False):
 
     agg_func_sum = weighted_sum if weighted == True else 'sum'
     agg_func_avg = weighted_avg if weighted == True else 'mean'
-    df_by_season = df_by_game.groupby('batter').agg({'H': 'sum', 'xH': agg_func_avg, 'G': 'sum', 'H_1+': agg_func_sum, 'xH_1+': agg_func_sum, 'statcast_G': 'sum'}).reset_index().rename({'xH': 'xH_per_G'}, axis=1)
+    df_by_season = df_by_game.groupby('batter').agg({'H': 'sum', 'xH': agg_func_avg, 'G': 'sum', 'H_1+': agg_func_sum, 'xH_1+': agg_func_sum, 'statcast_G': 'sum', 'order': agg_func_avg}).reset_index().rename({'xH': 'xH_per_G'}, axis=1)
     df_by_season['hit_pct'] = df_by_season['H_1+'] / df_by_season['G']
     df_by_season['x_hit_pct'] = df_by_season['xH_1+'] / df_by_season['statcast_G']
     df_by_season.drop(['H_1+', 'xH_1+', 'statcast_G'], axis=1, inplace=True)
@@ -467,17 +472,19 @@ def weighted_sum(s):
 def calculate_weights(s):
     weights = list()
     for i in range(len(s)):
-        if i == 0:
-            weights.append(1)
-        else:
-            weights.append(weights[-1] * 1.1)
+        weights.append(1 if i == 0 else weights[-1] * 1.1)
     return weights
 
 
 def get_hit_probability(calculations_df, player_info_df, todays_games_df):
+    start_time = time.time() # Start timer
+
     df = pd.merge(calculations_df, player_info_df[(player_info_df['position'] != 'P') | (player_info_df['name'] == 'Shohei Ohtani')], left_on='batter', right_on='id').drop(['id', 'T'], axis=1)
     df = pd.merge(df, todays_games_df.melt(id_vars='game_pk', value_vars=['away_team', 'home_team'], value_name='team').drop('variable', axis=1), on='team')
     df['probability'] = np.random.uniform(0, 1, df.shape[0]).round(4)
+
+    stop_timer('get_hit_probability()', start_time) # Stop timer
+    print('columns', df.columns, sep=': ')
     return df
 
 

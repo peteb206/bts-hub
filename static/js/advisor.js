@@ -15,9 +15,9 @@ $(document).ready(function () {
    var playerLinkFunc = function(id, name, position, type) {
       var out = '';
       if (id) {
-         if (type == 'link') {
+         if (type === 'link') {
             out = '<a class="playerLink text-primary" href="https://www.mlb.com/player/' + id + '" target="_blank" style="text-decoration:none">' + name + '</a>';
-         } else if (type == 'selector') {
+         } else if (type === 'selector') {
             out = '<a class="' + id + ' ' + position + ' playerSelector text-primary" href="#"  style="text-decoration:none">' + name + '</a>';
          }
       }
@@ -25,7 +25,7 @@ $(document).ready(function () {
    }
 
    var selectItem = function(type, position, id, name) {
-      if (type == 'player') {
+      if (type === 'player') {
          $('#selectedImage').attr('src', 'https://securea.mlb.com/mlb/images/players/head_shot/' + id + '.jpg');
          $('#selectedName').html(playerLinkFunc(id, name, position, 'link'));
       }
@@ -79,7 +79,7 @@ $(document).ready(function () {
                         var game = ajax_data.games[row.game_pk];
                         var metrics = ajax_data.metrics[row.batter]
                         var lineup = [];
-                        if (metrics.team == game.away_team && game.away_lineup !== undefined) {
+                        if (metrics.team === game.away_team && game.away_lineup !== undefined) {
                            lineup = game.away_lineup;
                         } else if (game.home_lineup !== undefined) {
                            lineup = game.home_lineup;
@@ -102,7 +102,7 @@ $(document).ready(function () {
                      render: function (data, type, row) {
                         var game = ajax_data.games[row.game_pk];
                         var opponent = '';
-                        if (ajax_data.metrics[row.batter].team == game.away_team) {
+                        if (ajax_data.metrics[row.batter].team === game.away_team) {
                            opponent = '@' + game.home_team;
                         } else {
                            opponent = game.away_team;
@@ -118,14 +118,14 @@ $(document).ready(function () {
                         var game = ajax_data.games[row.game_pk];
                         var starter = '';
                         var key = '';
-                        if (ajax_data.metrics[row.batter].team == game.away_team) {
+                        if (ajax_data.metrics[row.batter].team === game.away_team) {
                            key = game.home_starter_id;
                         } else {
                            key = game.away_starter_id;
                         }
-                        if (ajax_data.opponents[key] !== undefined) {
-                           var name = ajax_data.opponents[key].name;
-                           starter = playerLinkFunc(key, name, 'pitcher', 'selector') + ' (' + ajax_data.opponents[key].T + ')';
+                        if (ajax_data.opponents.starters[key] !== undefined) {
+                           var starter = ajax_data.opponents.starters[key];
+                           starter = playerLinkFunc(key, starter.name, 'pitcher', 'selector') + ' (' + starter.T + ')';
                         }
                         return starter;
                      }

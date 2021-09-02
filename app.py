@@ -59,19 +59,22 @@ def index():
     calculations_df = pd.merge(calculate_per_pa_dfs[0], calculations_df, how='right', on='batter').rename({'L': 'H_per_PA_vs_L', 'R': 'H_per_PA_vs_R'}, axis=1)
     calculations_df = pd.merge(calculate_per_pa_dfs[1], calculations_df, how='right', on='batter').rename({'H_per_PA': 'H_per_PA_vs_BP'}, axis=1)
 
-    opponent_starter_df = statcast_df[statcast_df['pitcher'].isin(todays_starting_pitchers)].groupby('pitcher')[['hit', 'xBA']].mean().reset_index()
-    opponent_starter_df = pd.merge(opponent_starter_df, player_info_df, left_on='pitcher', right_on='id').drop(['id', 'team', 'B'], axis=1)
-    # opponent_bullpen_events_df = pd.merge(statcast_df[statcast_df['starter_flg'] == False])
-    # opponent_bullpen_df = opponent_bullpen_events_df.groupby('team')[['hit', 'xBA']].mean()
+    opponent_starter_df = statcast_df[statcast_df['pitcher'].isin(todays_starting_pitchers)].groupby('pitcher')[['hit', 'xBA']].mean().round(3).reset_index()
+    opponent_starter_df = pd.merge(opponent_starter_df, calculate_per_pa_dfs[2], how='left', on='pitcher')
+    opponent_starter_df = pd.merge(opponent_starter_df, player_info_df, left_on='pitcher', right_on='id').drop(['id', 'team', 'B'], axis=1).set_index('pitcher')
+    opponent_bullpen_df = statcast_df[statcast_df['starter_flg'] == False].groupby('pitching_team')[['hit', 'xBA']].mean().round(3)
 
-    all_df = get_hit_probability(calculations_df, player_info_df, todays_games_df)
+    all_df = get_hit_probability(calculations_df, player_info_df, todays_games_df, opponent_starter_df, opponent_bullpen_df)
     all_df = color_columns(all_df, min_hits)
 
     out = jsonify(
         {
             'rows': all_df[['game_pk', 'batter', 'probability']].drop_duplicates().sort_values(by='probability', ascending=False).to_dict(orient='records'),
             'metrics': all_df.drop(['game_pk', 'probability'], axis=1).drop_duplicates(subset='batter').set_index('batter').round(3).to_dict('index'),
-            'opponents': pd.concat([opponent_starter_df]).set_index('pitcher').round(3).to_dict(orient='index'),
+            'opponents': {
+                'starters': opponent_starter_df.to_dict(orient='index'),
+                'bullpens': opponent_bullpen_df.to_dict(orient='index')
+            },
             'games': todays_games_df.set_index('game_pk').to_dict(orient='index'),
             'headToHead': {},
             'weather': get_weather() if date_string == datetime.datetime.now(tz.gettz('America/Chicago')).date().strftime('%Y-%m-%d') else {},
@@ -225,8 +228,10 @@ def enrich_data(df, schedule_df, player_info_df, today_str):
     df['hit'] = df['events'].apply(lambda event: is_hit(event))
     df = pd.merge(df, schedule_df[schedule_df['game_date'] < today_str], on='game_pk').sort_values(by='game_date')
     df['starter_flg'] = np.where(df['home'] == True, df['pitcher'] == df['home_starter_id'], df['pitcher'] == df['away_starter_id'])
+    df['pitching_team'] = np.where(df['home'] == True, df['home_team'], df['away_team'])
     df = pd.merge(df, player_info_df[['id', 'B']], how='left', left_on='batter', right_on='id').drop('id', axis=1)
     df = pd.merge(df, player_info_df[['id', 'T']], how='left', left_on='pitcher', right_on='id').drop('id', axis=1).rename({'B': 'batter_handedness', 'T': 'pitcher_handedness'}, axis=1)
+    df['batter_handedness'] = np.where(df['batter_handedness'] == 'S', np.where(df['pitcher_handedness'] == 'L', 'R', 'L'), df['batter_handedness'])
 
     stop_timer('enrich_data()', start_time) # Stop timer
     return df
@@ -260,8 +265,8 @@ def calculate_hit_per_pa(statcast_df):
     start_time = time.time() # Start timer
 
     batter_vs_pitcher_hand_df = statcast_df.pivot_table(values='hit', index='batter', columns='pitcher_handedness').reset_index()
-    batter_vs_relievers_df = statcast_df[statcast_df['starter_flg'] == False].groupby('batter')['hit'].mean().reset_index().rename({'hit': 'H_per_PA'}, axis=1).sort_values(by='H_per_PA', ascending=False)
-    pitcher_vs_batter_hand_df = statcast_df.pivot_table(values='hit', index='pitcher', columns='batter_handedness').reset_index()
+    batter_vs_relievers_df = statcast_df[statcast_df['starter_flg'] == False].groupby('batter')['hit'].mean().reset_index().rename({'hit': 'H_per_PA'}, axis=1)
+    pitcher_vs_batter_hand_df = statcast_df.pivot_table(values='hit', index='pitcher', columns='batter_handedness').reset_index().rename({'L': 'SP_H_per_BF_vs_L', 'R': 'SP_H_per_BF_vs_R'}, axis=1)
 
     stop_timer('calculate_hit_per_pa()', start_time) # Stop timer
     return batter_vs_pitcher_hand_df, batter_vs_relievers_df, pitcher_vs_batter_hand_df
@@ -476,16 +481,33 @@ def calculate_weights(s):
     return weights
 
 
-def get_hit_probability(calculations_df, player_info_df, todays_games_df):
+def get_hit_probability(calculations_df, player_info_df, todays_games_df, opponent_starter_df, opponent_bullpen_df):
     start_time = time.time() # Start timer
 
     df = pd.merge(calculations_df, player_info_df[(player_info_df['position'] != 'P') | (player_info_df['name'] == 'Shohei Ohtani')], left_on='batter', right_on='id').drop(['id', 'T'], axis=1)
-    df = pd.merge(df, todays_games_df.melt(id_vars='game_pk', value_vars=['away_team', 'home_team'], value_name='team').drop('variable', axis=1), on='team')
+
+    todays_matchups_df = pd.DataFrame()
+    for side in ['away', 'home']:
+        other = 'home' if side == 'away' else 'away'
+        side_df = todays_games_df.copy()
+        side_df.columns = [col.replace(other, 'opponent').replace(side, 'team') for col in side_df.columns]
+        side_df['home_away'] = side
+        side_df = side_df.drop(['game_date', 'game_time', 'team_starter_id', 'opponent_lineup'], axis=1).rename({'team_team': 'team', 'opponent_team': 'opponent', 'opponent_starter_id': 'pitcher'}, axis=1)
+        todays_matchups_df = todays_matchups_df.append(side_df, ignore_index=True)
+    df = pd.merge(df, todays_matchups_df, how='left', on='team')
+
+    df = pd.merge(df, opponent_starter_df.drop(['name', 'position'], axis=1), how='left', left_on='pitcher', right_index=True, suffixes=['', '_starter'])
+    df = pd.merge(df, opponent_bullpen_df, how='left', left_on='opponent', right_index=True, suffixes=['', '_bullpen'])
+
+    df['H_per_PA_vs_SP_Hand'] = df.apply(lambda row: row['H_per_PA_vs_{}'.format(row['T'])] if type(row['T']) == type('') else (row['H_per_PA_vs_R'] + row['H_per_PA_vs_L']) / 2, axis=1)
+    df['B'] = np.where(df['B'] == 'S', np.where(df['T'] == 'L', 'R', 'L'), df['B'])
+    df['H_per_BF_vs_B_Hand'] = df.apply(lambda row: row['SP_H_per_BF_vs_{}'.format(row['B'])], axis=1).fillna(0)
+
     df['probability'] = np.random.uniform(0, 1, df.shape[0]).round(4)
 
     stop_timer('get_hit_probability()', start_time) # Stop timer
-    print('columns', df.columns, sep=': ')
-    return df
+    print('columns', list(df.columns), sep=': ')
+    return df[['batter', 'game_pk', 'probability', 'name', 'team', 'B'] + [col for col in df.columns if (col.endswith('_total')) | (col.endswith('_weighted')) | (col.endswith('_Hand'))]]
 
 
 def stop_timer(function_name, start_time):

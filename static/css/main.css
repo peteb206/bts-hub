@@ -5,6 +5,6 @@ th, td {
     white-space: nowrap;
     text-align: center
 }
-.display {
+#main-content {
     font-size: 13px;
 }

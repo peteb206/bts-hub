@@ -51,7 +51,8 @@ def index():
     # Query this year's data from database
     statcast_df = get_statcast_events(this_years_games_df)
     statcast_df = enrich_data(statcast_df, this_years_games_df, player_info_df, date_string)
-    last_updated = statcast_df['game_date'].values[-1]
+    game_date_values = statcast_df['game_date'].values
+    start_date, end_date = game_date_values[0], game_date_values[-1]
 
     calculations_df = pd.merge(calculate_hit_pct(statcast_df, weighted = False), calculate_hit_pct(statcast_df, weighted = True), on='batter', suffixes=('_total', '_weighted'))
 
@@ -78,7 +79,8 @@ def index():
             'games': todays_games_df.set_index('game_pk').to_dict(orient='index'),
             'headToHead': {},
             'weather': get_weather() if date_string == datetime.datetime.now(tz.gettz('America/Chicago')).date().strftime('%Y-%m-%d') else {},
-            'lastUpdated': last_updated
+            'startDate': start_date,
+            'endDate': end_date
         }
     )
 

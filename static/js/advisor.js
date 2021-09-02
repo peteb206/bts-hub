@@ -42,6 +42,7 @@ $(document).ready(function () {
             },
             columns: cols,
             order: [[0, 'desc']],
+            pagingType: 'full',
             bFilter: false,
             destroy: true,
             dom: 'Bfrtip',
@@ -75,7 +76,7 @@ $(document).ready(function () {
          day = '0' + day;
       }
       var yyyy_mm_dd = [year, month, day].join('-');
-      $('#loadingText').text('Loading predictions for ' + yyyy_mm_dd);
+      $('#loadingText').text('Loading predictions for ' + yyyy_mm_dd + '...');
 
       $.ajax({
          type: 'GET',
@@ -178,6 +179,7 @@ $(document).ready(function () {
                ],
                destroy: true,
                order: [[5, 'desc']],
+               pagingType: 'full',
                // scrollX: true,
                // paging: false,
                // scrollY: '75vh',
@@ -212,8 +214,8 @@ $(document).ready(function () {
                   td.css('color', 'white');
                },
                infoCallback: function(settings, start, end, max, total, pre) {
-                  if (ajax_data.lastUpdated) { // Add footnote to table
-                     pre += '<br>Most recent statcast data: <span style="color: red;">' + ajax_data.lastUpdated + '</span>';
+                  if (ajax_data.startDate && ajax_data.endDate) { // Add footnote to table
+                     pre += '<br>Using Statcast data from <span style="color: red;">' + ajax_data.startDate + '</span> to <span style="color: red;">' + ajax_data.endDate + '</span>';
                   }
                   // pre += '<br>* Indicates each game weighted 10% more than the previous one to account for adjustments, streaks, slumps, etc.';
                   return pre;

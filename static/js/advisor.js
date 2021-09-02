@@ -28,6 +28,27 @@ $(document).ready(function () {
       if (type === 'player') {
          $('#selectedImage').attr('src', 'https://securea.mlb.com/mlb/images/players/head_shot/' + id + '.jpg');
          $('#selectedName').html(playerLinkFunc(id, name, position, 'link'));
+
+         var cols = [];
+         var data_fields = ['Date', 'PA', 'BIP', 'Hits', 'xBA', 'K%', 'BB%'];
+         for (var i = 0; i < data_fields.length; i++) {
+            var col = data_fields[i];
+            var title = (col === 'Hits' ? 'H' : col);
+            cols.push({'data': col, 'title': title});
+         }
+         $('table.display#gameLogs').DataTable({
+            ajax: {
+               url: '/gameLogs?year=2021&type=batter&batter=' + id
+            },
+            columns: cols,
+            order: [[0, 'desc']],
+            bFilter: false,
+            destroy: true,
+            dom: 'Bfrtip',
+            buttons: [],
+            pageLength : 5,
+            // scrollX: true
+         });
       }
    }
 
@@ -53,10 +74,12 @@ $(document).ready(function () {
       if (day < 10) {
          day = '0' + day;
       }
+      var yyyy_mm_dd = [year, month, day].join('-');
+      $('#loadingText').text('Loading predictions for ' + yyyy_mm_dd);
 
       $.ajax({
          type: 'GET',
-         url: '/loadTableData?hitMin=10&date=' + [year, month, day].join('-'),
+         url: '/loadTableData?hitMin=10&date=' + yyyy_mm_dd,
          dataType: 'json',
          // async: false,
          success : function(ajax_data) {
@@ -131,7 +154,7 @@ $(document).ready(function () {
                      }
                   }, {
                      data: 'probability',
-                     title: 'Probability',
+                     title: '%',
                      className: 'border_left',
                      render: function (data, type, row) {
                         var out = '';
@@ -169,7 +192,7 @@ $(document).ready(function () {
                // },
                dom: 'Bfrtip',
                buttons: [
-                  'pageLength',
+                  // 'pageLength',
                   {
                      text: 'Pick History',
                      action: function (e, dt, button, config) {

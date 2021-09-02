@@ -27,7 +27,7 @@
          <script type="text/javascript"                src="{{url_for('static', filename='js/pick_history.js')}}"></script>
       </head>
 
-      <div class="container">
+      <div class="container-fluid">
          <div class="row">
             <div class="col-4">
                <p>Date: <input type="text" id="datepicker"></p>
@@ -47,7 +47,9 @@
                   <strong id="loadingText" class="text-primary"></strong>
                </div>
             </div>
-            <div class="col-8">
+         </div>
+         <div class="row justify-content-around">
+            <div class="col-lg-6">
                <div id="advisorDiv">
                   <table class="display" id="advisor"></table>
                </div>
@@ -55,7 +57,7 @@
                   <table class="display" id="history"></table>
                </div>
             </div>
-            <div class="col">
+            <div class="col-lg-4">
                <div id="selectedDiv">
                   <div class="row">
                      <div class="col">
@@ -65,8 +67,12 @@
                         <h5 id="selectedName"></h5>
                      </div>
                   </div>
+                  <div class="row">
+                     <table class="display" id="gameLogs"></table>
+                  </div>
                </div>
             </div>
+         </div>
          </div>
       </div>
    </body>

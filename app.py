@@ -411,7 +411,7 @@ def get_schedule(year=None, date=None, game_pk=None, lineups=False):
     if game_pk != None:
         url_params.append('gamePk={}'.format(game_pk))
     if lineups == True:
-        url_params.append('hydrate=probablePitcher,lineups')
+        url_params.append('hydrate=probablePitcher,lineups,linescore')
     else:
         url_params.append('hydrate=probablePitcher')
     schedule_url += '&'.join(url_params)
@@ -421,7 +421,7 @@ def get_schedule(year=None, date=None, game_pk=None, lineups=False):
     schedule_df3 = schedule_df2.explode('games')
     team_matchups_df = pd.json_normalize(schedule_df3['games'])
     team_matchups_df['game_date'] = team_matchups_df['gameDate'].apply(lambda x: utc_to_central(x, 'date'))
-    team_matchups_df['game_time'] = team_matchups_df.apply(lambda row: utc_to_central(row['gameDate'], 'time') if row['status.statusCode'] == 'S' else row['status.detailedState'], axis=1)
+    team_matchups_df['game_time'] = team_matchups_df.apply(lambda row: game_time_func(row), axis=1)
     if 'lineups.awayPlayers' in team_matchups_df.columns:
         keep_cols += ['away_lineup', 'home_lineup']
         col_rename_dict['lineups.awayPlayers'] = 'away_lineup'
@@ -461,6 +461,21 @@ def lineup_func(lineups, player_id, team):
     return out
 
 
+def game_time_func(row):
+    game_time = ''
+    if row['status.statusCode'] == 'I':
+        row_keys = row.keys()
+        if 'linescore.currentInningOrdinal' in row_keys:
+            game_time = row['linescore.currentInningOrdinal']
+        if 'linescore.inningHalf' in row_keys:
+            game_time = '{} {}'.format(row['linescore.inningHalf'], game_time)
+    else:
+        game_time = utc_to_central(row['gameDate'], 'time')
+        if game_time[0] == '0':
+            game_time = game_time[1:]
+    return game_time
+
+
 def weighted_avg(s):
     return np.average(s, weights = calculate_weights(s)) if len(s) > 0 else 0
 
@@ -492,9 +507,9 @@ def get_hit_probability(calculations_df, player_info_df, todays_games_df, oppone
         side_df = todays_games_df.copy()
         side_df.columns = [col.replace(other, 'opponent').replace(side, 'team') for col in side_df.columns]
         side_df['home_away'] = side
-        side_df = side_df.drop(['game_date', 'game_time', 'team_starter_id', 'opponent_lineup'], axis=1).rename({'team_team': 'team', 'opponent_team': 'opponent', 'opponent_starter_id': 'pitcher'}, axis=1)
+        side_df = side_df.drop([col for col in ['game_date', 'game_time', 'team_starter_id', 'opponent_lineup'] if col in side_df.columns], axis=1).rename({'team_team': 'team', 'opponent_team': 'opponent', 'opponent_starter_id': 'pitcher'}, axis=1)
         todays_matchups_df = todays_matchups_df.append(side_df, ignore_index=True)
-    df = pd.merge(df, todays_matchups_df, how='left', on='team')
+    df = pd.merge(df, todays_matchups_df, on='team')
 
     df = pd.merge(df, opponent_starter_df.drop(['name', 'position'], axis=1), how='left', left_on='pitcher', right_index=True, suffixes=['', '_starter'])
     df = pd.merge(df, opponent_bullpen_df, how='left', left_on='opponent', right_index=True, suffixes=['', '_bullpen'])
@@ -508,6 +523,50 @@ def get_hit_probability(calculations_df, player_info_df, todays_games_df, oppone
     stop_timer('get_hit_probability()', start_time) # Stop timer
     print('columns', list(df.columns), sep=': ')
     return df[['batter', 'game_pk', 'probability', 'name', 'team', 'B'] + [col for col in df.columns if (col.endswith('_total')) | (col.endswith('_weighted')) | (col.endswith('_Hand'))]]
+
+
+@app.route('/gameLogs')
+def game_logs():
+    start_time = time.time() # Start timer
+
+    player_type = request.args.get('type')
+    player_id = request.args.get(player_type)
+    season = request.args.get('year')
+
+    if (player_type == None) | (player_id == None) | (season == None):
+        return jsonify({'error': 'type, year and batter/pitcher are required parameters'})
+
+    url = 'https://baseballsavant.mlb.com/statcast_search?'
+    url_params = [
+        'hfGT=R%7C',
+        'hfSea={}%7C'.format(season),
+        'player_type={}'.format(player_type),
+        'batters_lookup%5B%5D={}'.format(player_id),
+        'min_pitches=0',
+        'min_results=0',
+        'group_by=name-date',
+        'player_event_sort=api_p_release_speed',
+        'min_pas=0',
+        'chk_stats_pa=on',
+        'chk_stats_abs=on',
+        'chk_stats_bip=on',
+        'chk_stats_hits=on',
+        'chk_stats_k_percent=on',
+        'chk_stats_bb_percent=on',
+        'chk_stats_babip=on',
+        'chk_stats_ba=on',
+        'chk_stats_xba=on'
+    ]
+    url += '&'.join(url_params)
+    df = pd.read_html(url)[0][['Date', 'PA', 'AB', 'BIP', 'Hits', 'xBA', 'BA', 'BABIP', 'K%', 'BB%']]
+    df.sort_values(by='Date', ascending=False, ignore_index=True, inplace=True)
+    for pct in ['K%', 'BB%']:
+        df[pct] = df[pct].apply(lambda x: x / 100 if x > 0 else 0)
+    df['Date'] = df['Date'].apply(lambda x: '-'.join(x.split('-')[1:]))
+
+    out = jsonify({'data': df.round(4).to_dict(orient='records')})
+    stop_timer('game_logs()', start_time) # Stop timer
+    return out
 
 
 def stop_timer(function_name, start_time):

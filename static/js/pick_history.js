@@ -40,6 +40,7 @@ $(document).ready(function () {
             title: 'Streak'
          }
       ],
+      pagingType: 'full',
       order: [[1, 'desc'], [0, 'asc']],
       // paging: false,
       // scrollX: true,
@@ -48,7 +49,7 @@ $(document).ready(function () {
       // autoWidth: false,
       dom: 'Bfrtip',
       buttons: [
-         'pageLength',
+         // 'pageLength',
          {
             text: 'Advisor',
             action: function (e, dt, button, config) {

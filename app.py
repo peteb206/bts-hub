@@ -34,6 +34,7 @@ def index():
 
     date_string = request.args.get('date')
     min_hits = int(request.args.get('hitMin'))
+    is_today = bool(request.args.get('isToday'))
 
     today = datetime.datetime.strptime(date_string, '%Y-%m-%d')
 
@@ -50,7 +51,10 @@ def index():
 
     # Query this year's data from database
     statcast_df = get_statcast_events(this_years_games_df)
+    statcast_df['hit'] = statcast_df['events'].apply(lambda event: is_hit(event))
+    player_hits_by_game_df = statcast_df.groupby(['game_pk', 'batter'])['hit'].sum().reset_index()
     statcast_df = enrich_data(statcast_df, this_years_games_df, player_info_df, date_string)
+
     game_date_values = statcast_df['game_date'].values
     start_date, end_date = game_date_values[0], game_date_values[-1]
 
@@ -68,17 +72,19 @@ def index():
     all_df = get_hit_probability(calculations_df, player_info_df, todays_games_df, opponent_starter_df, opponent_bullpen_df)
     all_df = color_columns(all_df, min_hits)
 
+    all_df = pd.merge(all_df, player_hits_by_game_df, how='left', on=['game_pk', 'batter']) # If not today, include how many hits player actually got in game
+
     out = jsonify(
         {
-            'rows': all_df[['game_pk', 'batter', 'probability']].drop_duplicates().sort_values(by='probability', ascending=False).to_dict(orient='records'),
-            'metrics': all_df.drop(['game_pk', 'probability'], axis=1).drop_duplicates(subset='batter').set_index('batter').round(3).to_dict('index'),
+            'rows': all_df[['game_pk', 'batter', 'probability', 'hit']].fillna(0).drop_duplicates().sort_values(by='probability', ascending=False).to_dict(orient='records'),
+            'metrics': all_df.drop(['game_pk', 'probability', 'hit'], axis=1).drop_duplicates(subset='batter').set_index('batter').round(3).to_dict('index'),
             'opponents': {
                 'starters': opponent_starter_df.to_dict(orient='index'),
                 'bullpens': opponent_bullpen_df.to_dict(orient='index')
             },
             'games': todays_games_df.set_index('game_pk').to_dict(orient='index'),
             'headToHead': {},
-            'weather': get_weather() if date_string == datetime.datetime.now(tz.gettz('America/Chicago')).date().strftime('%Y-%m-%d') else {},
+            'weather': get_weather() if is_today else {},
             'startDate': start_date,
             'endDate': end_date
         }
@@ -227,7 +233,6 @@ def enrich_data(df, schedule_df, player_info_df, today_str):
 
     df['statcast'] = df.groupby('game_pk')['xBA'].transform('sum') > 0
 
-    df['hit'] = df['events'].apply(lambda event: is_hit(event))
     df = pd.merge(df, schedule_df[schedule_df['game_date'] < today_str], on='game_pk').sort_values(by='game_date')
     df['starter_flg'] = np.where(df['home'] == True, df['pitcher'] == df['home_starter_id'], df['pitcher'] == df['away_starter_id'])
     df['pitching_team'] = np.where(df['home'] == True, df['home_team'], df['away_team'])

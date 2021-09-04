@@ -35,6 +35,7 @@ def index():
     date_string = request.args.get('date')
     min_hits = int(request.args.get('hitMin'))
     is_today = bool(request.args.get('isToday'))
+    from_app = bool(request.args.get('fromApp'))
 
     today = datetime.datetime.strptime(date_string, '%Y-%m-%d')
 
@@ -70,12 +71,12 @@ def index():
     opponent_bullpen_df = statcast_df[statcast_df['starter_flg'] == False].groupby('pitching_team')[['hit', 'xBA']].mean().round(3)
 
     all_df = get_hit_probability(calculations_df, player_info_df, todays_games_df, opponent_starter_df, opponent_bullpen_df)
-    all_df = color_columns(all_df, min_hits)
-
     all_df = pd.merge(all_df, player_hits_by_game_df, how='left', on=['game_pk', 'batter']) # If not today, include how many hits player actually got in game
-
-    out = jsonify(
-        {
+    if from_app == False:
+        out = jsonify(all_df.fillna(0).round(4).to_dict(orient='records'))
+    else:
+        all_df = color_columns(all_df, min_hits)
+        out = jsonify({
             'rows': all_df[['game_pk', 'batter', 'probability', 'hit']].fillna(0).drop_duplicates().sort_values(by='probability', ascending=False).to_dict(orient='records'),
             'metrics': all_df.drop(['game_pk', 'probability', 'hit'], axis=1).drop_duplicates(subset='batter').set_index('batter').round(3).to_dict('index'),
             'opponents': {
@@ -87,8 +88,7 @@ def index():
             'weather': get_weather() if is_today else {},
             'startDate': start_date,
             'endDate': end_date
-        }
-    )
+        })
 
     stop_timer('Total', start_time) # Stop timer
     return out
@@ -228,12 +228,12 @@ def enrich_data(df, schedule_df, player_info_df, today_str):
     start_time = time.time() # Start timer
 
     # Calculate batting order
-    df['order'] = df['order'] = df.groupby(['game_pk', 'home'])['batter'].cumcount() + 1
+    df['order'] = df.groupby(['game_pk', 'home'])['batter'].cumcount() + 1
     df['order'] = np.where(df['order'] < 10, df['order'], np.nan)
 
     df['statcast'] = df.groupby('game_pk')['xBA'].transform('sum') > 0
 
-    df = pd.merge(df, schedule_df[schedule_df['game_date'] < today_str], on='game_pk').sort_values(by='game_date')
+    df = pd.merge(df, schedule_df[schedule_df['game_date'] < today_str].drop_duplicates(subset='game_pk', keep='last'), on='game_pk').sort_values(by='game_date')
     df['starter_flg'] = np.where(df['home'] == True, df['pitcher'] == df['home_starter_id'], df['pitcher'] == df['away_starter_id'])
     df['pitching_team'] = np.where(df['home'] == True, df['home_team'], df['away_team'])
     df = pd.merge(df, player_info_df[['id', 'B']], how='left', left_on='batter', right_on='id').drop('id', axis=1)
@@ -251,10 +251,10 @@ def is_hit(event):
 def calculate_hit_pct(statcast_df, weighted = False):
     start_time = time.time() # Start timer
 
-    df_by_game = statcast_df.groupby(['game_date', 'game_pk', 'statcast', 'batter', 'order'])[['hit', 'xBA']].sum().reset_index().rename({'hit': 'H', 'xBA': 'xH'}, axis=1)
+    df_by_game = statcast_df.groupby(['game_date', 'game_pk', 'statcast', 'batter'])[['hit', 'xBA', 'order']].sum().reset_index().rename({'hit': 'H', 'xBA': 'xH'}, axis=1)
     df_by_game['H_1+'] = (df_by_game['H'] >= 1).astype(int)
     df_by_game['G'] = 1
-    df_by_game['xH_1+'] = (df_by_game[df_by_game['statcast'] == True]['xH'] >= 1).astype(int)
+    df_by_game['xH_1+'] = (df_by_game['xH'] >= 1).astype(int)
     df_by_game['statcast_G'] = np.where(df_by_game['statcast'] == True, 1, 0)
 
     agg_func_sum = weighted_sum if weighted == True else 'sum'
@@ -476,6 +476,8 @@ def game_time_func(row):
             game_time = row['linescore.currentInningOrdinal']
         if 'linescore.inningHalf' in row_keys:
             game_time = '{} {}'.format(row['linescore.inningHalf'], game_time)
+    elif row['status.statusCode'] in ['F', 'O']:
+        game_time = row['status.detailedState']
     else:
         game_time = utc_to_central(row['gameDate'], 'time')
         if game_time[0] == '0':
@@ -529,7 +531,7 @@ def get_hit_probability(calculations_df, player_info_df, todays_games_df, oppone
 
     stop_timer('get_hit_probability()', start_time) # Stop timer
     print('columns', list(df.columns), sep=': ')
-    return df[['batter', 'game_pk', 'probability', 'name', 'team', 'B'] + [col for col in df.columns if (col.endswith('_total')) | (col.endswith('_weighted')) | (col.endswith('_Hand'))]]
+    return df[['batter', 'game_pk', 'probability', 'name', 'team', 'B', 'H_per_PA_vs_BP', ] + [col for col in df.columns if col.split('_')[-1] in ['total', 'weighted', 'Hand', 'bullpen']]]
 
 
 @app.route('/gameLogs')

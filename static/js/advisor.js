@@ -96,7 +96,7 @@ $(document).ready(function () {
       $('#loadingText').text('Loading predictions for ' + yyyy_mm_dd + '...');
       $.ajax({
          type: 'GET',
-         url: '/loadTableData?hitMin=10&date=' + yyyy_mm_dd + '&isToday=' + is_today,
+         url: '/loadTableData?fromApp=true&hitMin=10&date=' + yyyy_mm_dd + (is_today ? '&isToday=true' : ''),
          dataType: 'json',
          // async: false,
          success : function(ajax_data) {

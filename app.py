@@ -12,6 +12,7 @@ from dateutil import tz
 import pymongo
 from bs4 import BeautifulSoup
 import re
+import statsmodels.api as sm
 
 
 app = Flask(__name__)
@@ -41,7 +42,7 @@ def index():
 
     # Today's schedule, player details
     this_years_games_df = get_schedule(year=today.year, lineups=False)
-    todays_games_df = get_schedule(year=today.year, date=today, lineups=True)
+    todays_games_df = get_schedule(year=today.year, date=today, lineups=True, is_today=is_today)
     player_info_df = get_player_info(year=today.year, hitters=True, pitchers=True)
 
     starting_pitcher_df = todays_games_df.melt(id_vars=['away_starter_id', 'home_starter_id'], value_vars=['away_team', 'home_team'], var_name='home_away', value_name='team')
@@ -73,7 +74,7 @@ def index():
     all_df = get_hit_probability(calculations_df, player_info_df, todays_games_df, opponent_starter_df, opponent_bullpen_df)
     all_df = pd.merge(all_df, player_hits_by_game_df, how='left', on=['game_pk', 'batter']) # If not today, include how many hits player actually got in game
     if from_app == False:
-        out = jsonify(all_df.fillna(0).round(4).to_dict(orient='records'))
+        out = jsonify(all_df.drop(['name', 'team', 'B'], axis=1).fillna(0).round(4).to_dict(orient='records'))
     else:
         all_df = color_columns(all_df, min_hits)
         out = jsonify({
@@ -397,7 +398,7 @@ def get_player_info(year=2021, hitters=True, pitchers=True):
     return player_df3.drop('currentTeam.id', axis=1)
 
 
-def get_schedule(year=None, date=None, game_pk=None, lineups=False):
+def get_schedule(year=None, date=None, game_pk=None, lineups=False, is_today=True):
     start_time = time.time() # Start timer
 
     keep_cols = ['game_pk', 'game_date', 'game_time', 'away_id', 'home_id', 'away_starter_id', 'home_starter_id']
@@ -428,7 +429,7 @@ def get_schedule(year=None, date=None, game_pk=None, lineups=False):
     schedule_df3 = schedule_df2.explode('games')
     team_matchups_df = pd.json_normalize(schedule_df3['games'])
     team_matchups_df['game_date'] = team_matchups_df['gameDate'].apply(lambda x: utc_to_central(x, 'date'))
-    team_matchups_df['game_time'] = team_matchups_df.apply(lambda row: game_time_func(row), axis=1)
+    team_matchups_df['game_time'] = team_matchups_df.apply(lambda row: game_time_func(row, is_today=is_today), axis=1)
     if 'lineups.awayPlayers' in team_matchups_df.columns:
         keep_cols += ['away_lineup', 'home_lineup']
         col_rename_dict['lineups.awayPlayers'] = 'away_lineup'
@@ -468,7 +469,7 @@ def lineup_func(lineups, player_id, team):
     return out
 
 
-def game_time_func(row):
+def game_time_func(row, is_today):
     game_time = ''
     if row['status.statusCode'] == 'I':
         row_keys = row.keys()
@@ -476,7 +477,7 @@ def game_time_func(row):
             game_time = row['linescore.currentInningOrdinal']
         if 'linescore.inningHalf' in row_keys:
             game_time = '{} {}'.format(row['linescore.inningHalf'], game_time)
-    elif row['status.statusCode'] in ['F', 'O']:
+    elif (is_today == False) | (row['status.statusCode'] in ['F', 'O', 'UR', 'CR']) | ('D' in row['status.statusCode']):
         game_time = row['status.detailedState']
     else:
         game_time = utc_to_central(row['gameDate'], 'time')
@@ -527,11 +528,13 @@ def get_hit_probability(calculations_df, player_info_df, todays_games_df, oppone
     df['B'] = np.where(df['B'] == 'S', np.where(df['T'] == 'L', 'R', 'L'), df['B'])
     df['H_per_BF_vs_B_Hand'] = df.apply(lambda row: row['SP_H_per_BF_vs_{}'.format(row['B'])], axis=1).fillna(0)
 
-    df['probability'] = np.random.uniform(0, 1, df.shape[0]).round(4)
+    model = sm.load('log_reg_model.pickle')
+    predictors = ['G_total', 'H_per_BF_vs_B_Hand', 'H_per_PA_vs_BP', 'H_per_PA_vs_SP_Hand', 'H_total', 'hit_bullpen', 'hit_pct_total', 'hit_pct_weighted', 'order_total', 'order_weighted', 'xBA_bullpen', 'xH_per_G_total', 'xH_per_G_weighted', 'x_hit_pct_total', 'x_hit_pct_weighted']
+    df['probability'] = model.predict(df[predictors].astype(float))
 
     stop_timer('get_hit_probability()', start_time) # Stop timer
     print('columns', list(df.columns), sep=': ')
-    return df[['batter', 'game_pk', 'probability', 'name', 'team', 'B', 'H_per_PA_vs_BP', ] + [col for col in df.columns if col.split('_')[-1] in ['total', 'weighted', 'Hand', 'bullpen']]]
+    return df[['batter', 'game_pk', 'probability', 'name', 'team', 'B', 'H_per_PA_vs_BP'] + [col for col in df.columns if col.split('_')[-1] in ['total', 'weighted', 'Hand', 'bullpen']]]
 
 
 @app.route('/gameLogs')

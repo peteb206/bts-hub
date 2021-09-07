@@ -33,56 +33,70 @@ def home():
 def index():
     start_time = time.time() # Start timer
 
-    date_string = request.args.get('date')
+    date_arg = request.args.get('date')
     min_hits = int(request.args.get('hitMin'))
     is_today = bool(request.args.get('isToday'))
     from_app = bool(request.args.get('fromApp'))
 
-    today = datetime.datetime.strptime(date_string, '%Y-%m-%d')
+    # This year
+    if from_app == True:
+        date_arg = date_arg.split(',')[0] # Only use the first date when reading from the app
+    dates = date_arg.split(',')
+    print('\n------------------------------', 'Calculating predictions for {}...'.format(dates), sep='\n')
+    first_date_year = datetime.datetime.strptime(dates[0], '%Y-%m-%d').year
+    this_years_games_df = get_schedule(year=first_date_year, lineups=False)
+    player_info_df = get_player_info(year=first_date_year, hitters=True, pitchers=True)
+    statcast_year_df = get_statcast_events(this_years_games_df) # Query this year's data from database
+    statcast_year_df['hit'] = statcast_year_df['events'].apply(lambda event: is_hit(event))
+    player_hits_by_game_df = statcast_year_df.groupby(['game_pk', 'batter'])['hit'].sum().reset_index()
+    statcast_year_df = enrich_data(statcast_year_df, this_years_games_df, player_info_df)
 
-    # Today's schedule, player details
-    this_years_games_df = get_schedule(year=today.year, lineups=False)
-    todays_games_df = get_schedule(year=today.year, date=today, lineups=True, is_today=is_today)
-    player_info_df = get_player_info(year=today.year, hitters=True, pitchers=True)
+    all_dfs, opponent_starter_df, opponent_bullpen_df, todays_games_df, start_date, end_date = list(), None, None, None, None, None # Initialize some variables before iterating
+    for date_string in dates:
+        # Today
+        today = datetime.datetime.strptime(date_string, '%Y-%m-%d')
+        todays_games_df = get_schedule(year=today.year, date=today, lineups=True, is_today=is_today)
+        print('\nThere are {} games on {}...'.format(len(todays_games_df.index), date_string))
+        if len(todays_games_df.index) > 0:
+            # There are games today
+            statcast_df = statcast_year_df[statcast_year_df['game_date'] < date_string]
+            starting_pitcher_df = todays_games_df.melt(id_vars=['away_starter_id', 'home_starter_id'], value_vars=['away_team', 'home_team'], var_name='home_away', value_name='team')
+            starting_pitcher_df['pitcher'] = np.where(starting_pitcher_df['home_away'] == 'away_team', starting_pitcher_df['away_starter_id'], starting_pitcher_df['home_starter_id'])
+            starting_pitcher_teams = starting_pitcher_df.set_index('pitcher')['team'].to_dict()
+            todays_starting_pitchers = list(starting_pitcher_teams.keys())
 
-    starting_pitcher_df = todays_games_df.melt(id_vars=['away_starter_id', 'home_starter_id'], value_vars=['away_team', 'home_team'], var_name='home_away', value_name='team')
-    starting_pitcher_df['pitcher'] = np.where(starting_pitcher_df['home_away'] == 'away_team', starting_pitcher_df['away_starter_id'], starting_pitcher_df['home_starter_id'])
-    starting_pitcher_teams = starting_pitcher_df.set_index('pitcher')['team'].to_dict()
-    # todays_teams = list(starting_pitcher_teams.values())
-    todays_starting_pitchers = list(starting_pitcher_teams.keys())
+            game_date_values = statcast_df['game_date'].values
+            start_date, end_date = game_date_values[0], game_date_values[-1]
 
-    # Query this year's data from database
-    statcast_df = get_statcast_events(this_years_games_df)
-    statcast_df['hit'] = statcast_df['events'].apply(lambda event: is_hit(event))
-    player_hits_by_game_df = statcast_df.groupby(['game_pk', 'batter'])['hit'].sum().reset_index()
-    statcast_df = enrich_data(statcast_df, this_years_games_df, player_info_df, date_string)
+            calculations_df = pd.merge(calculate_hit_pct(statcast_df, weighted = False), calculate_hit_pct(statcast_df, weighted = True), on='batter', suffixes=('_total', '_weighted'))
 
-    game_date_values = statcast_df['game_date'].values
-    start_date, end_date = game_date_values[0], game_date_values[-1]
+            calculate_per_pa_dfs = calculate_hit_per_pa(statcast_df)
+            calculations_df = pd.merge(calculate_per_pa_dfs[0], calculations_df, how='right', on='batter').rename({'L': 'H_per_PA_vs_L', 'R': 'H_per_PA_vs_R'}, axis=1)
+            calculations_df = pd.merge(calculate_per_pa_dfs[1], calculations_df, how='right', on='batter').rename({'H_per_PA': 'H_per_PA_vs_BP'}, axis=1)
 
-    calculations_df = pd.merge(calculate_hit_pct(statcast_df, weighted = False), calculate_hit_pct(statcast_df, weighted = True), on='batter', suffixes=('_total', '_weighted'))
+            opponent_starter_df = statcast_df[statcast_df['pitcher'].isin(todays_starting_pitchers)].groupby('pitcher')[['hit', 'xBA']].mean().round(3).reset_index()
+            opponent_starter_df = pd.merge(opponent_starter_df, calculate_per_pa_dfs[2], how='left', on='pitcher')
+            opponent_starter_df = pd.merge(opponent_starter_df, player_info_df, left_on='pitcher', right_on='id').drop(['id', 'team', 'B'], axis=1).set_index('pitcher')
+            opponent_bullpen_df = statcast_df[statcast_df['starter_flg'] == False].groupby('pitching_team')[['hit', 'xBA']].mean()
 
-    calculate_per_pa_dfs = calculate_hit_per_pa(statcast_df)
-    calculations_df = pd.merge(calculate_per_pa_dfs[0], calculations_df, how='right', on='batter').rename({'L': 'H_per_PA_vs_L', 'R': 'H_per_PA_vs_R'}, axis=1)
-    calculations_df = pd.merge(calculate_per_pa_dfs[1], calculations_df, how='right', on='batter').rename({'H_per_PA': 'H_per_PA_vs_BP'}, axis=1)
+            all_df = get_hit_probability(calculations_df, player_info_df, todays_games_df, opponent_starter_df, opponent_bullpen_df)
+            all_df = pd.merge(all_df, player_hits_by_game_df, how='left', on=['game_pk', 'batter']) # If not today, include how many hits player actually got in game
+            if len(dates) > 1:
+                all_df['date'] = date_string
+            all_dfs.append(all_df)
 
-    opponent_starter_df = statcast_df[statcast_df['pitcher'].isin(todays_starting_pitchers)].groupby('pitcher')[['hit', 'xBA']].mean().round(3).reset_index()
-    opponent_starter_df = pd.merge(opponent_starter_df, calculate_per_pa_dfs[2], how='left', on='pitcher')
-    opponent_starter_df = pd.merge(opponent_starter_df, player_info_df, left_on='pitcher', right_on='id').drop(['id', 'team', 'B'], axis=1).set_index('pitcher')
-    opponent_bullpen_df = statcast_df[statcast_df['starter_flg'] == False].groupby('pitching_team')[['hit', 'xBA']].mean().round(3)
+    all_df = pd.concat(all_dfs, ignore_index=True)
 
-    all_df = get_hit_probability(calculations_df, player_info_df, todays_games_df, opponent_starter_df, opponent_bullpen_df)
-    all_df = pd.merge(all_df, player_hits_by_game_df, how='left', on=['game_pk', 'batter']) # If not today, include how many hits player actually got in game
     if from_app == False:
-        out = jsonify(all_df.drop(['name', 'team', 'B'], axis=1).fillna(0).round(4).to_dict(orient='records'))
+        out = jsonify(all_df[all_df['order'] > -1].drop(['name', 'team', 'B'], axis=1).fillna(0).round(4).to_dict(orient='records'))
     else:
         all_df = color_columns(all_df, min_hits)
         out = jsonify({
-            'rows': all_df[['game_pk', 'batter', 'probability', 'hit']].fillna(0).drop_duplicates().sort_values(by='probability', ascending=False).to_dict(orient='records'),
+            'rows': all_df[['game_pk', 'batter', 'probability', 'hit']].fillna(0).round(4).drop_duplicates().sort_values(by='probability', ascending=False).to_dict(orient='records'),
             'metrics': all_df.drop(['game_pk', 'probability', 'hit'], axis=1).drop_duplicates(subset='batter').set_index('batter').round(3).to_dict('index'),
             'opponents': {
-                'starters': opponent_starter_df.to_dict(orient='index'),
-                'bullpens': opponent_bullpen_df.to_dict(orient='index')
+                'starters': opponent_starter_df.fillna(0).round(3).to_dict(orient='index'),
+                'bullpens': opponent_bullpen_df.fillna(0).round(3).to_dict(orient='index')
             },
             'games': todays_games_df.set_index('game_pk').to_dict(orient='index'),
             'headToHead': {},
@@ -225,7 +239,7 @@ def read_database():
     return collection
 
 
-def enrich_data(df, schedule_df, player_info_df, today_str):
+def enrich_data(df, schedule_df, player_info_df):
     start_time = time.time() # Start timer
 
     # Calculate batting order
@@ -234,7 +248,7 @@ def enrich_data(df, schedule_df, player_info_df, today_str):
 
     df['statcast'] = df.groupby('game_pk')['xBA'].transform('sum') > 0
 
-    df = pd.merge(df, schedule_df[schedule_df['game_date'] < today_str].drop_duplicates(subset='game_pk', keep='last'), on='game_pk').sort_values(by='game_date')
+    df = pd.merge(df, schedule_df.drop_duplicates(subset='game_pk', keep='last'), on='game_pk').sort_values(by='game_date')
     df['starter_flg'] = np.where(df['home'] == True, df['pitcher'] == df['home_starter_id'], df['pitcher'] == df['away_starter_id'])
     df['pitching_team'] = np.where(df['home'] == True, df['home_team'], df['away_team'])
     df = pd.merge(df, player_info_df[['id', 'B']], how='left', left_on='batter', right_on='id').drop('id', axis=1)
@@ -425,6 +439,8 @@ def get_schedule(year=None, date=None, game_pk=None, lineups=False, is_today=Tru
     schedule_url += '&'.join(url_params)
 
     schedule_df1 = pd.read_json(schedule_url)
+    if len(schedule_df1.index) == 0:
+        return pd.DataFrame() # No games were scheduled for this day
     schedule_df2 = pd.json_normalize(schedule_df1['dates'])[['date', 'games']]
     schedule_df3 = schedule_df2.explode('games')
     team_matchups_df = pd.json_normalize(schedule_df3['games'])
@@ -434,6 +450,8 @@ def get_schedule(year=None, date=None, game_pk=None, lineups=False, is_today=Tru
         keep_cols += ['away_lineup', 'home_lineup']
         col_rename_dict['lineups.awayPlayers'] = 'away_lineup'
         col_rename_dict['lineups.homePlayers'] = 'home_lineup'
+    elif lineups == True:
+        return pd.DataFrame() # No lineups were found despite request... likely that no scheduled games were completed for this day
     team_matchups_df = team_matchups_df.rename(col_rename_dict, axis=1)[keep_cols]
 
     if year == None:
@@ -527,14 +545,15 @@ def get_hit_probability(calculations_df, player_info_df, todays_games_df, oppone
     df['H_per_PA_vs_SP_Hand'] = df.apply(lambda row: row['H_per_PA_vs_{}'.format(row['T'])] if type(row['T']) == type('') else (row['H_per_PA_vs_R'] + row['H_per_PA_vs_L']) / 2, axis=1)
     df['B'] = np.where(df['B'] == 'S', np.where(df['T'] == 'L', 'R', 'L'), df['B'])
     df['H_per_BF_vs_B_Hand'] = df.apply(lambda row: row['SP_H_per_BF_vs_{}'.format(row['B'])], axis=1).fillna(0)
+    df['order'] = df.apply(lambda row: row['team_lineup'].index(row['batter']) / 8 if row['batter'] in row['team_lineup'] else row['order_total'], axis=1)
 
     model = sm.load('log_reg_model.pickle')
-    predictors = ['G_total', 'H_per_BF_vs_B_Hand', 'H_per_PA_vs_BP', 'H_per_PA_vs_SP_Hand', 'H_total', 'hit_bullpen', 'hit_pct_total', 'hit_pct_weighted', 'order_total', 'order_weighted', 'xBA_bullpen', 'xH_per_G_total', 'xH_per_G_weighted', 'x_hit_pct_total', 'x_hit_pct_weighted']
+    predictors = ['H_per_BF_vs_B_Hand', 'H_per_PA_vs_BP', 'H_per_PA_vs_SP_Hand', 'hit_bullpen', 'hit_pct_total', 'hit_pct_weighted', 'order', 'xBA_bullpen', 'xH_per_G_total', 'xH_per_G_weighted', 'x_hit_pct_total', 'x_hit_pct_weighted']
     df['probability'] = model.predict(df[predictors].astype(float))
 
     stop_timer('get_hit_probability()', start_time) # Stop timer
-    print('columns', list(df.columns), sep=': ')
-    return df[['batter', 'game_pk', 'probability', 'name', 'team', 'B', 'H_per_PA_vs_BP'] + [col for col in df.columns if col.split('_')[-1] in ['total', 'weighted', 'Hand', 'bullpen']]]
+    # print('columns', list(df.columns), sep=': ')
+    return df[['batter', 'game_pk', 'probability', 'name', 'team', 'B', 'order', 'H_per_PA_vs_BP'] + [col for col in df.columns if col.split('_')[-1] in ['total', 'weighted', 'Hand', 'bullpen']]]
 
 
 @app.route('/gameLogs')

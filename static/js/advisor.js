@@ -176,7 +176,7 @@ $(document).ready(function () {
                      render: percentFunc
                   }, {
                      data: 'hit',
-                     title: '',
+                     title: (is_today ? '' : 'H'),
                      className: 'border_left',
                      render: function (data, type, row) {
                         var out = data;

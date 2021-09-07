@@ -100,103 +100,97 @@ $(document).ready(function () {
          dataType: 'json',
          // async: false,
          success : function(ajax_data) {
-            var cols = [
-               {
-                  data: 'batter',
-                  title: 'Name',
-                  render: function (data, type, row) {
-                     var out = playerLinkFunc(data, ajax_data.metrics[data].name, 'batter', 'selector');
-                     if (ajax_data.metrics[data] != undefined) {
-                        out += ' (' + ajax_data.metrics[data].B + ')';
-                     }
-                     return out;
-                  }
-               }, {
-                  title: 'Lineup',
-                  render: function (data, type, row) {
-                     var game = ajax_data.games[row.game_pk];
-                     var metrics = ajax_data.metrics[row.batter]
-                     var lineup = [];
-                     if (metrics.team === game.away_team && game.away_lineup !== undefined) {
-                        lineup = game.away_lineup;
-                     } else if (game.home_lineup !== undefined) {
-                        lineup = game.home_lineup;
-                     }
-                     var order = 'TBD';
-                     if (lineup.length > 0) {
-                        order = lineup.indexOf(row.batter) + 1;
-                     } else if (metrics.order_total) {
-                        order += ' (' + metrics.order_total.toFixed(1) + ')';
-                     }
-                     return (order === 0 ? 'OUT' : order);
-                  }
-               }, {
-                  title: 'Team',
-                  render: function (data, type, row) {
-                     return ajax_data.metrics[row.batter].team;
-                  }
-               }, {
-                  title: 'Opponent',
-                  render: function (data, type, row) {
-                     var game = ajax_data.games[row.game_pk];
-                     var opponent = '';
-                     if (ajax_data.metrics[row.batter].team === game.away_team) {
-                        opponent = '@' + game.home_team;
-                     } else {
-                        opponent = game.away_team;
-                     }
-                     if (opponent !== '') {
-                        opponent += ' (<a href="https://www.mlb.com/gameday/' + row.game_pk + '" target="_blank" class="text-primary" style="text-decoration:none">' + game.game_time + '</a>)';
-                     }
-                     return opponent;
-                  }
-               }, {
-                  title: 'Starter',
-                  render: function (data, type, row) {
-                     var game = ajax_data.games[row.game_pk];
-                     var starter = '';
-                     var key = '';
-                     if (ajax_data.metrics[row.batter].team === game.away_team) {
-                        key = game.home_starter_id;
-                     } else {
-                        key = game.away_starter_id;
-                     }
-                     if (ajax_data.opponents.starters[key] !== undefined) {
-                        var starter = ajax_data.opponents.starters[key];
-                        starter = playerLinkFunc(key, starter.name, 'pitcher', 'selector') + ' (' + starter.T + ')';
-                     }
-                     return starter;
-                  }
-               }, {
-                  data: 'probability',
-                  title: '%',
-                  className: 'border_left',
-                  render: percentFunc
-               }
-            ]
-            if (is_today) {
-               cols.push({
-                  title: '',
-                  className: 'border_left',
-                  render: function (data, type, row) {
-                     var out = '';
-                     var team = ajax_data.metrics[row.batter].team;
-                     if (ajax_data.weather[team] !== undefined) {
-                        out = '<img style="display:block;" height="20px" src="https://rotowire.com/images/weather/' + ajax_data.weather[team] + '">';
-                     }
-                     return out;
-                  }
-               });
-            } else {
-               cols.push({
-                  data: 'hit',
-                  title: 'H',
-                  className: 'border_left'
-               });
-            }
             $('table.display#advisor').DataTable({
                data: ajax_data.rows,
-               columns: cols,
+               columns: [
+                  {
+                     data: 'batter',
+                     title: 'Name',
+                     render: function (data, type, row) {
+                        var out = playerLinkFunc(data, ajax_data.metrics[data].name, 'batter', 'selector');
+                        if (ajax_data.metrics[data] != undefined) {
+                           out += ' (' + ajax_data.metrics[data].B + ')';
+                        }
+                        return out;
+                     }
+                  }, {
+                     title: 'Lineup',
+                     render: function (data, type, row) {
+                        var game = ajax_data.games[row.game_pk];
+                        var metrics = ajax_data.metrics[row.batter]
+                        var lineup = [];
+                        if (metrics.team === game.away_team && game.away_lineup !== undefined) {
+                           lineup = game.away_lineup;
+                        } else if (game.home_lineup !== undefined) {
+                           lineup = game.home_lineup;
+                        }
+                        var order = 'TBD';
+                        if (lineup.length > 0) {
+                           order = lineup.indexOf(row.batter) + 1;
+                        } else if (metrics.order_total) {
+                           order += ' (' + metrics.order_total.toFixed(1) + ')';
+                        }
+                        return (order === 0 ? 'OUT' : order);
+                     }
+                  }, {
+                     title: 'Team',
+                     render: function (data, type, row) {
+                        return ajax_data.metrics[row.batter].team;
+                     }
+                  }, {
+                     title: 'Opponent',
+                     render: function (data, type, row) {
+                        var game = ajax_data.games[row.game_pk];
+                        var opponent = '';
+                        if (ajax_data.metrics[row.batter].team === game.away_team) {
+                           opponent = '@' + game.home_team;
+                        } else {
+                           opponent = game.away_team;
+                        }
+                        if (opponent !== '') {
+                           opponent += ' (<a href="https://www.mlb.com/gameday/' + row.game_pk + '" target="_blank" class="text-primary" style="text-decoration:none">' + game.game_time + '</a>)';
+                        }
+                        return opponent;
+                     }
+                  }, {
+                     title: 'Starter',
+                     render: function (data, type, row) {
+                        var game = ajax_data.games[row.game_pk];
+                        var starter = '';
+                        var key = '';
+                        if (ajax_data.metrics[row.batter].team === game.away_team) {
+                           key = game.home_starter_id;
+                        } else {
+                           key = game.away_starter_id;
+                        }
+                        if (ajax_data.opponents.starters[key] !== undefined) {
+                           var starter = ajax_data.opponents.starters[key];
+                           starter = playerLinkFunc(key, starter.name, 'pitcher', 'selector') + ' (' + starter.T + ')';
+                        }
+                        return starter;
+                     }
+                  }, {
+                     data: 'probability',
+                     title: '%',
+                     className: 'border_left',
+                     render: percentFunc
+                  }, {
+                     data: 'hit',
+                     title: '',
+                     className: 'border_left',
+                     render: function (data, type, row) {
+                        var out = data;
+                        if (ajax_data.games[row.game_pk].game_time.includes(':')) {
+                           // Game has not started... return weather
+                           var team = ajax_data.metrics[row.batter].team;
+                           if (ajax_data.weather[team] !== undefined) {
+                              out = '<img style="display:block;" height="20px" src="https://rotowire.com/images/weather/' + ajax_data.weather[team] + '">';
+                           }
+                        }
+                        return out;
+                     }
+                  }
+               ],
                destroy: true,
                order: [[5, 'desc']],
                pagingType: 'full',

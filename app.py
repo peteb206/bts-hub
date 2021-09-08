@@ -57,7 +57,7 @@ def index():
         # Today
         today = datetime.datetime.strptime(date_string, '%Y-%m-%d')
         todays_games_df = get_schedule(year=today.year, date=today, lineups=True, is_today=is_today)
-        print('\nThere are {} games on {}...'.format(len(todays_games_df.index), date_string))
+        print('--- NOTE: There are {} games on {}...'.format(len(todays_games_df.index), date_string))
         if len(todays_games_df.index) > 0:
             # There are games today
             statcast_df = statcast_year_df[statcast_year_df['game_date'] < date_string]
@@ -107,12 +107,13 @@ def index():
             'endDate': end_date
         })
 
-    stop_timer('Total', start_time) # Stop timer
+    stop_timer('\nTotal', start_time) # Stop timer
     return out
 
 
 def get_statcast_events(this_years_games_df):
     start_time = time.time() # Start timer
+    print('--- NOTE: retrieving statcast events from database...')
 
     collection = read_database()
     # Query the year's data from database
@@ -128,7 +129,7 @@ def get_statcast_events(this_years_games_df):
 
     out = pd.DataFrame.from_records(entries)
 
-    stop_timer('get_statcast_events()', start_time) # Stop timer
+    stop_timer('get_statcast_events(): {} events... '.format(len(entries)), start_time) # Stop timer
     return out
 
 
@@ -612,4 +613,4 @@ def injured_player_ids(year=None):
 
 
 def stop_timer(function_name, start_time):
-    print('\n', '{} time: {}'.format(function_name, datetime.timedelta(seconds = round(time.time() - start_time))), sep='')
+    print('{} time: {}'.format(function_name, datetime.timedelta(seconds = round(time.time() - start_time))))

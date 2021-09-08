@@ -1,0 +1,10 @@
+.border_left {
+    border-left: 2px solid;
+}
+th, td {
+    white-space: nowrap;
+    text-align: center
+}
+#main-content {
+    font-size: 13px;
+}

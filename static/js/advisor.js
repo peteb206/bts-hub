@@ -1,237 +1,250 @@
 $(document).ready(function () {
    $('#historyDiv').hide();
+   // Data Picker Initialization
+   var day = new Date();
+   $('#datepicker').datepicker({
+      autoClose: true,
+      dateFormat: 'MM d, yy',
+      onSelect: function(date, datePicker) {
+         if (date !== datePicker.lastVal) {
+            loadWithDate(new Date(date));
+         }
+      }
+   }).datepicker('setDate', day);
+
+   var playerLinkFunc = function(id, name, position, type) {
+      var out = '';
+      if (id) {
+         if (type === 'link') {
+            out = '<a class="playerLink text-primary" href="https://www.mlb.com/player/' + id + '" target="_blank" style="text-decoration:none">' + name + '</a>';
+         } else if (type === 'selector') {
+            out = '<a class="' + id + ' ' + position + ' playerSelector text-primary" href="#"  style="text-decoration:none">' + name + '</a>';
+         }
+      }
+      return out;
+   }
 
    var percentFunc = function (data, type, row) {
-      if (data === '') {
-         return data;
-      } else {
-         return (data * 100).toFixed(2).toString() + '%';
+      var out = '';
+      if (data !== '') {
+         var decimals = (row['K%'] !== undefined ? 0 : 2);
+         out = (data * 100).toFixed(decimals).toString() + '%';
       }
+      return out;
    }
 
-   var roundFunc = function (data, digits) {
-      if (data === '' || data === undefined) {
-         return data;
-      } else {
-         return data.toFixed(digits).toString();
-      }
-   }
+   var selectItem = function(type, position, id, name) {
+      if (type === 'player') {
+         $('#selectedImage').attr('src', 'https://securea.mlb.com/mlb/images/players/head_shot/' + id + '.jpg');
+         $('#selectedName').html(playerLinkFunc(id, name, position, 'link'));
 
-   var roundFunc2 = function (data, type, row) {
-      return roundFunc(data, 2)
-   }
-
-   var roundFunc3 = function (data, type, row) {
-      return roundFunc(data, 3)
-   }
-
-   var playerLinkFunc = function(id, name) {
-      if (id) {
-         return '<a href="https://www.mlb.com/player/' + id + '" target="_blank" style="text-decoration:none; color:#0076CE">' + name + '</a>';
-      } else {
-         return ''
-      }
-   }
-
-   var batterLinkFunc = function (data, type, row) {
-      return playerLinkFunc(row.player_id, data);
-   }
-
-   var pitcherLinkFunc = function (data, type, row) {
-      return playerLinkFunc(row.pitcher_id, data);
-   }
-
-   var gameLinkFunc = function (data, type, row) {
-      return '<a href="https://www.mlb.com/gameday/' + row.game_pk + '" target="_blank" style="text-decoration:none; color:#0076CE">' + data + '</a>';
-   }
-
-   var headToHeadFunc = function (data, type, row) {
-      if (row.PA_vs_SP > 0) {
-         return (data / row.PA_vs_SP).toFixed(2).toString() + ' (' + data.toString() + ' / ' + row.PA_vs_SP.toString() + ')';
-      }
-      return ''
-   }
-
-   var cols = [
-      {
-         data: 'player_name',
-         title: 'Name',
-         render: batterLinkFunc
-      }, {
-         data: 'team',
-         title: 'Team'
-      }, {
-         data: 'batter_handedness',
-         title: 'B'
-      }, {
-         data: 'order',
-         title: 'Lineup'
-      }, {
-         data: 'H_total',
-         title: 'H',
-         className: 'border_left'
-      }, {
-         data: 'xH_per_G_total',
-         title: 'xH / G',
-         render: roundFunc2
-      }, {
-         data: 'hit_pct_total',
-         title: 'Hit %',
-         render: percentFunc
-      }, {
-         data: 'x_hit_pct_total',
-         title: 'xHit %',
-         render: percentFunc
-      }, {
-         data: 'H_per_PA_vs_L',
-         title: 'H / PA (vs. L)',
-         render: roundFunc3
-      }, {
-         data: 'H_per_PA_vs_R',
-         title: 'H / PA (vs. R)',
-         render: roundFunc3
-      }, {
-         data: 'H_per_PA_vs_BP',
-         title: 'H / PA (vs. BP)',
-         render: roundFunc3
-      }, {
-         data: 'xH_per_G_weighted',
-         title: 'xH / G*',
-         render: roundFunc2,
-         className: 'border_left'
-      }, {
-         data: 'hit_pct_weighted',
-         title: 'Hit %*',
-         render: percentFunc
-      }, {
-         data: 'x_hit_pct_weighted',
-         title: 'xHit %*',
-         render: percentFunc
-      }, {
-         data: 'opponent',
-         title: 'Opponent',
-         render: gameLinkFunc,
-         className: 'border_left'
-      }, {
-         data: 'pitcher_name',
-         title: 'Starter',
-         render: pitcherLinkFunc
-      }, {
-         data: 'sp_HA_per_BF_total',
-         title: 'SP: H / BF'
-      }, {
-         data: 'sp_xHA_per_BF_total',
-         title: 'SP: xH / BF'
-      }, {
-         data: 'H_per_BF_vs_L',
-         title: 'SP: H / BF (vs. L)',
-         render: roundFunc3
-      }, {
-         data: 'H_per_BF_vs_R',
-         title: 'SP: H / BF (vs. R)',
-         render: roundFunc3
-      }, {
-         data: 'bp_HA_per_BF_total',
-         title: 'RP: H / BF'
-      }, {
-         data: 'bp_xHA_per_BF_total',
-         title: 'RP: xH / BF'
-      }, {
-         data: 'H_vs_SP',
-         title: 'B vs SP: H / PA',
-         render: headToHeadFunc,
-         className: 'border_left'
-      }, {
-         data: 'xH_vs_SP',
-         title: 'B vs SP: xH / PA',
-         render: headToHeadFunc
-      }, {
-         data: 'weather',
-         title: '',
-         render: function (data, type, row) {return (data !== '') ? '<img style="display:block;" height="20px" height=auto src="https://rotowire.com/images/weather/' + data + '">' : ''},
-         className: 'border_left'
-      }
-   ]
-
-   var date = new Date();
-   var day = String(date.getDate()).padStart(2, '0');
-   var month = String(date.getMonth() + 1).padStart(2, '0');
-   var year = date.getFullYear();
-   var yyyy_mm_dd = [year, month, day].join('-');
-   $('#title').html('Beat the Streak Advisor: ' + yyyy_mm_dd);
-
-   var create_table = function() {
-      return $('table.display#advisor').DataTable({
-         ajax: {
-            url: '/loadTableData?hitMin=10&day=' + yyyy_mm_dd
-         },
-         columns: cols,
-         order: [[ 6, 'desc']],
-         scrollX: true,
-         paging: false,
-         scrollY: '75vh',
-         scrollCollapse: true,
-         autoWidth: false,
-         columnDefs: [{
-            targets: '_all',
-            defaultContent: ''
-         }],
-         fixedColumns: {
-            leftColumns: 4
-         },
-         dom: 'Bfrtip',
-         buttons: [
-            'csv',
-            {
-               text: 'Pick History',
-               action: function (e, dt, button, config) {
-                  $('#advisorDiv').hide();
-                  $('#historyDiv').show();
-               }
+         var cols = [];
+         var data_fields = ['Date', 'PA', 'Hits', 'xBA', 'BIP', 'K%', 'BB%'];
+         for (var i = 0; i < data_fields.length; i++) {
+            var col = data_fields[i];
+            var title = (col === 'Hits' ? 'H' : col);
+            var colDetails = {'data': col, 'title': title};
+            if (col == 'K%' || col =='BB%') {
+               colDetails.render = percentFunc;
             }
-         ],
-         initComplete: function(oSettings, json) {
-            var th = $('#advisorDiv').find('th');
-            var td = $('#advisorDiv').find('td');
-            th.css('white-space', 'nowrap'); // Don't wrap table headers
-            td.css('white-space', 'nowrap'); // Don't wrap table data
-            th.css('text-align', 'center'); // Center text
-            td.css('text-align', 'center'); // Center text
+            cols.push(colDetails);
+         }
+         $('table.display#gameLogs').DataTable({
+            ajax: {
+               url: '/gameLogs?year=2021&type=batter&batter=' + id
+            },
+            columns: cols,
+            order: [[0, 'desc']],
+            pagingType: 'full',
+            bFilter: false,
+            destroy: true,
+            dom: 'Bfrtip',
+            buttons: [],
+            pageLength : 5,
+            // scrollX: true
+         });
+      }
+   }
 
-            var toolbarHtml = '';
-            toolbarHtml += '<div style="float: left;">';
-            toolbarHtml += '   <p>Most recent statcast data: ';
-            toolbarHtml += '      <span style="color: red;">' + json.lastUpdated + '</span>';
-            toolbarHtml += '   </p>';
-            toolbarHtml += '</div>';
+   $(document).on('click', 'a.playerSelector', function(e) {
+      var classes = $(e.target).attr('class');
+      var id = parseInt(classes);
+      var name = $(e.target).text();
+      var position = classes[1];
+      selectItem('player', position, id, name);
+      return false;
+   });
 
-            $('#advisorDiv').find('toolbar').html(toolbarHtml);
-         },
-         rowCallback: function(row, data, index) {
-            Object.keys(data).forEach(function(key, colIndex) {
-               if (data[key + '_color']) { // Color scale column
-                  var colDisplayIndex = cols.findIndex(item => item.data === key);
-                  $(row).find('td:eq(' + colDisplayIndex + ')').css('background-color', data[key + '_color']);
-               }
-               if (data['order'].toString() === 'OUT') { // Red cell if player is out of lineup
-                  $(row).find('td:eq(3)').css('background-color', 'red');
-                  $(row).find('td:eq(3)').css('color', 'white');
+   var loadWithDate = function (date) {
+      $('#selectedDiv').hide();
+      $('#advisorDiv').hide();
+      $('#spinnerDiv').removeClass('d-none');
+
+      var year = date.getFullYear()
+      var month = date.getMonth() + 1;
+      var day = date.getDate();
+      var today = new Date();
+      var is_today = ((today.getFullYear() === year) && (today.getMonth() + 1 === month) && (today.getDate() === day));
+      if (month < 10) {
+         month = '0' + month;
+      }
+      if (day < 10) {
+         day = '0' + day;
+      }
+      var yyyy_mm_dd = [year, month, day].join('-');
+
+      $('#loadingText').text('Loading predictions for ' + yyyy_mm_dd + '...');
+      $.ajax({
+         type: 'GET',
+         url: '/loadTableData?fromApp=true&hitMin=10&date=' + yyyy_mm_dd + (is_today ? '&isToday=true' : ''),
+         dataType: 'json',
+         // async: false,
+         success : function(ajax_data) {
+            $('table.display#advisor').DataTable({
+               data: ajax_data.rows,
+               columns: [
+                  {
+                     data: 'batter',
+                     title: 'Name',
+                     render: function (data, type, row) {
+                        var out = playerLinkFunc(data, ajax_data.metrics[data].name, 'batter', 'selector');
+                        if (ajax_data.metrics[data] != undefined) {
+                           out += ' (' + ajax_data.metrics[data].B + ')';
+                        }
+                        return out;
+                     }
+                  }, {
+                     title: 'Lineup',
+                     render: function (data, type, row) {
+                        var game = ajax_data.games[row.game_pk];
+                        var metrics = ajax_data.metrics[row.batter]
+                        var lineup = [];
+                        if (metrics.team === game.away_team && game.away_lineup !== undefined) {
+                           lineup = game.away_lineup;
+                        } else if (game.home_lineup !== undefined) {
+                           lineup = game.home_lineup;
+                        }
+                        var order = 'TBD';
+                        if (lineup.length > 0) {
+                           order = lineup.indexOf(row.batter) + 1;
+                        } else if (metrics.order_total) {
+                           order += ' (' + metrics.order_total.toFixed(1) + ')';
+                        }
+                        return (order === 0 ? 'OUT' : order);
+                     }
+                  }, {
+                     title: 'Team',
+                     render: function (data, type, row) {
+                        return ajax_data.metrics[row.batter].team;
+                     }
+                  }, {
+                     title: 'Opponent',
+                     render: function (data, type, row) {
+                        var game = ajax_data.games[row.game_pk];
+                        var opponent = '';
+                        if (ajax_data.metrics[row.batter].team === game.away_team) {
+                           opponent = '@' + game.home_team;
+                        } else {
+                           opponent = game.away_team;
+                        }
+                        if (opponent !== '') {
+                           opponent += ' (<a href="https://www.mlb.com/gameday/' + row.game_pk + '" target="_blank" class="text-primary" style="text-decoration:none">' + game.game_time + '</a>)';
+                        }
+                        return opponent;
+                     }
+                  }, {
+                     title: 'Starter',
+                     render: function (data, type, row) {
+                        var game = ajax_data.games[row.game_pk];
+                        var starter = '';
+                        var key = '';
+                        if (ajax_data.metrics[row.batter].team === game.away_team) {
+                           key = game.home_starter_id;
+                        } else {
+                           key = game.away_starter_id;
+                        }
+                        if (ajax_data.opponents.starters[key] !== undefined) {
+                           var starter = ajax_data.opponents.starters[key];
+                           starter = playerLinkFunc(key, starter.name, 'pitcher', 'selector') + ' (' + starter.T + ')';
+                        }
+                        return starter;
+                     }
+                  }, {
+                     data: 'probability',
+                     title: '%',
+                     className: 'border_left',
+                     render: percentFunc
+                  }, {
+                     data: 'hit',
+                     title: (is_today ? '' : 'H'),
+                     className: 'border_left',
+                     render: function (data, type, row) {
+                        var out = data;
+                        if (ajax_data.games[row.game_pk].game_time.includes(':')) {
+                           // Game has not started... return weather
+                           var team = ajax_data.metrics[row.batter].team;
+                           if (ajax_data.weather[team] !== undefined) {
+                              out = '<img style="display:block;" height="20px" src="https://rotowire.com/images/weather/' + ajax_data.weather[team] + '">';
+                           }
+                        }
+                        return out;
+                     }
+                  }
+               ],
+               destroy: true,
+               order: [[5, 'desc']],
+               pagingType: 'full',
+               // scrollX: true,
+               // paging: false,
+               // scrollY: '75vh',
+               // scrollCollapse: true,
+               // autoWidth: false,
+               columnDefs: [{
+                  targets: '_all',
+                  defaultContent: ''
+               }],
+               // fixedColumns: {
+               //    leftColumns: 1
+               // },
+               dom: 'Bfrtip',
+               buttons: [
+                  // 'pageLength',
+                  {
+                     text: 'Pick History',
+                     action: function (e, dt, button, config) {
+                        $('#advisorDiv').hide();
+                        $('#historyDiv').show();
+                     }
+                  }
+               ],
+               initComplete: function(oSettings, json) {
+                  $('#spinnerDiv').addClass('d-none');
+                  $('#advisorDiv').show();
+                  $('#selectedDiv').show();
+               },
+               rowCallback: function(row, data, index) {
+                  var td = $(row).find('td:contains(OUT)');
+                  td.css('background-color', 'red');
+                  td.css('color', 'white');
+               },
+               infoCallback: function(settings, start, end, max, total, pre) {
+                  if (ajax_data.startDate && ajax_data.endDate) { // Add footnote to table
+                     pre += '<br>Using Statcast data from <span style="color: red;">' + ajax_data.startDate + '</span> to <span style="color: red;">' + ajax_data.endDate + '</span>';
+                  }
+                  // pre += '<br>* Indicates each game weighted 10% more than the previous one to account for adjustments, streaks, slumps, etc.';
+                  return pre;
                }
             });
-         },
-         infoCallback: function(settings, start, end, max, total, pre) {
-            var info = '';
-            if (settings) {
-               var json = settings.json;
-               if (json) { // Add footnote to table
-                  var spacer = ' '.repeat(10) + '|' + ' '.repeat(10); 
-                  info = 'Most recent statcast data: <span style="color: red;">' + json.lastUpdated + '</span>' + spacer + 'Showing ' + max + ' players' + spacer + '* Indicates each game weighted 10% more than the previous one to account for adjustments, streaks, slumps, etc.';
-               }
+      
+            if (ajax_data.rows.length > 0) {
+               var topBatter = ajax_data.rows[0];
+               selectItem('player', 'batter', topBatter.batter, ajax_data.metrics[topBatter.batter].name);
             }
-            return info;
+         },
+         error: function() {
+            console.error('Ajax call failed, so the DataTable was not initialized.');
          }
-      })
-   }
-
-   create_table();
+      });
+   };
+   loadWithDate(day);
 });

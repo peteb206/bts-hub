@@ -234,8 +234,8 @@ def read_database():
     start_time = time.time() # Start timer
 
     client = pymongo.MongoClient(os.environ.get('DATABASE_CLIENT'))
-    database = client[os.environ.get('DATABASE_NAME')]
-    collection = database[os.environ.get('DATABASE_COLLECTION')]
+    database = client['statcast']
+    collection = database['statcastEvents']
 
     stop_timer('read_database()', start_time) # Stop timer
     return collection

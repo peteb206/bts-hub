@@ -93,7 +93,7 @@ $(document).ready(function () {
       }
       var yyyy_mm_dd = [year, month, day].join('-');
 
-      $('#loadingText').text('Loading predictions for ' + yyyy_mm_dd + '...');
+      $('#loadingText').text('Loading predictions for ' + $('#datepicker').val() + '...');
       $.ajax({
          type: 'GET',
          url: '/loadTableData?fromApp=true&hitMin=10&date=' + yyyy_mm_dd + (is_today ? '&isToday=true' : ''),

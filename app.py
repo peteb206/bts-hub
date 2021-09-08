@@ -92,7 +92,7 @@ def index():
     if from_app == False:
         out = jsonify(all_df[all_df['order'] > -1].drop(['name', 'team', 'B'], axis=1).fillna(0).round(4).to_dict(orient='records'))
     else:
-        all_df = color_columns(all_df, min_hits)
+        all_df = all_df[all_df['H_total'] >= min_hits]
         out = jsonify({
             'rows': all_df[['game_pk', 'batter', 'probability', 'hit']].fillna(0).round(4).drop_duplicates().sort_values(by='probability', ascending=False).to_dict(orient='records'),
             'metrics': all_df.drop(['game_pk', 'probability', 'hit', 'order'], axis=1).drop_duplicates(subset='batter').set_index('batter').round(3).to_dict('index'),
@@ -137,21 +137,30 @@ def get_statcast_events(this_years_games_df):
 def get_pick_history():
     start_time = time.time() # Start timer
 
+    year = int(request.args.get('year'))
+    date = request.args.get('date')
     accounts = ['peteb206', 'pberryman6']
 
     picks = list()
     for account in accounts:
         okta_uid = os.environ.get('OKTA_UID_{}'.format(account.upper()))
-        url = f'https://fantasy-lookup-service.mlb.com/fantasylookup/json/named.bts_profile_cmpsd.bam?bts_game_id=12&bts_user_recent_results.maxRows=200&timeframe=365&fntsy_game_id=10&bts_mulligan_status.game_id=bts2021&okta_uid={okta_uid}'
-        full_json = json.loads(session.get(url, headers = header, timeout = 10).text)
-        pick_history = full_json['bts_profile_cmpsd']['bts_user_recent_results']['queryResults']['row']
-        pick_history_df = pd.DataFrame(pick_history)
-        pick_history_df['game_date'] = pick_history_df['game_date'].apply(lambda x: x.split('T')[0])
-        pick_history_df['account'] = account
-        pick_history_df.rename({'name_display_first_last': 'name'}, axis = 1, inplace = True)
-        picks += pick_history_df.to_dict('records')
+        for url in [
+            f'https://fantasy-lookup-service.mlb.com/fantasylookup/json/named.bts_profile_cmpsd.bam?bts_game_id=12&bts_user_recent_results.maxRows=300&timeframe=365&fntsy_game_id=10&bts_mulligan_status.game_id=bts{year}&okta_uid={okta_uid}',
+            f'https://fantasy-lookup-service.mlb.com/fantasylookup/rawjson/named.bts_hitdd_picks.bam?ns=mlb&okta_uid={okta_uid}&max_days_back=0&max_days_ahead=0&bts_game_id=12&year={year}&focus_date={date}'
+        ]:
+            full_json = json.loads(session.get(url, headers = header).text)
+            pick_history = full_json['bts_profile_cmpsd']['bts_user_recent_results']['queryResults']['row'] if 'bts_profile_cmpsd' in full_json.keys() else full_json['pick_dates'][0]['picks']
+            pick_history_df = pd.DataFrame(pick_history)
+            if len(pick_history_df.index) > 0:
+                pick_history_df['game_date'] = pick_history_df['game_date'].apply(lambda x: x.split('T')[0])
+                pick_history_df['opp_descriptor'] = pick_history_df['opp_descriptor'].apply(lambda x: x.split(',')[0])
+                pick_history_df['account'] = account
+                pick_history_df.rename({'name_display_first_last': 'name'}, axis = 1, inplace = True)
+                picks.append(pick_history_df)
 
-    out = jsonify({'data': picks})
+    picks_df = pd.concat(picks, ignore_index=True)[['ab', 'account', 'game_date', 'hit', 'name', 'opp_descriptor', 'player_id', 'status', 'streak']].fillna('').drop_duplicates(subset=['account', 'game_date', 'player_id'])
+
+    out = jsonify({'data': picks_df.to_dict('records')})
     stop_timer('get_pick_history', start_time) # Stop timer
     return out
 
@@ -297,48 +306,6 @@ def calculate_hit_per_pa(statcast_df):
     return batter_vs_pitcher_hand_df, batter_vs_relievers_df, pitcher_vs_batter_hand_df
 
 
-def get_opponent_info(statcast_df, today):
-    start_time = time.time() # Start timer
-
-    matchups = list()
-    url = 'https://baseballsavant.mlb.com/schedule?date={}'.format(today.strftime('%Y-%m-%d'))
-    response_json = session.get(url, headers = header).json()
-    response_dict = json.loads(json.dumps(response_json))
-    games = response_dict['schedule']['dates'][0]['games']
-    for game in games:
-        game_number = game['gameNumber']
-        game_pk = game['gamePk']
-        game_time_utc = datetime.datetime.strptime(game['gameDate'], '%Y-%m-%dT%H:%M:%SZ')
-        game_time_utc = game_time_utc.replace(tzinfo=tz.gettz('UTC'))
-        game_time_current_time_zone = game_time_utc.astimezone(tz.gettz('America/Chicago'))
-        game_time_string = game_time_current_time_zone.strftime('%I:%M %p %Z')
-        teams = game['teams']
-        for home_away in ['away', 'home']:
-            team = teams[home_away]
-            team_abbreviation = team['team']['abbreviation']
-            opposing_team_abbreviation = teams['home' if home_away == 'away' else 'away']['team']['abbreviation']
-            matchup_dict = dict()
-            matchup_dict['team'] = team_abbreviation
-            matchup_dict['opponent'] = opposing_team_abbreviation
-            matchup_dict['home_away'] = home_away
-            matchup_dict['game_pk'] = game_pk
-            matchup_dict['game_number'] = game_number
-            matchup_dict['game_time'] = game_time_string if game_time_string[0] != '0' else game_time_string[1:]
-            if 'probablePitcher' in team.keys():
-                pitcher_id = team['probablePitcher']['id']
-                matchup_dict['pitcher_id'] = pitcher_id
-                matchup_dict['pitcher_name'] = team['probablePitcher']['firstLastName'] + ' (' + team['probablePitcher']['pitchHand']['code'] + ')'
-                matchup_dict['sp_HA_per_BF_total'], matchup_dict['sp_xHA_per_BF_total']  = get_pitcher_stats(statcast_df[statcast_df['pitcher'] == pitcher_id])
-            else:
-                matchup_dict['pitcher_id'] = -1
-            matchup_dict['bp_HA_per_BF_total'], matchup_dict['bp_xHA_per_BF_total'] = get_pitcher_stats(statcast_df[(statcast_df['opponent'] == team_abbreviation) & (statcast_df['starter_flg'] == False)])
-            matchups.append(matchup_dict)
-    matchups_df = pd.DataFrame(matchups).rename({'team': 'pitching_team'}, axis=1)
-
-    stop_timer('get_opponent_info()', start_time) # Stop timer
-    return matchups_df
-
-
 def get_pitcher_stats(df, since_date=None):
     if since_date != None:
         df = df[df['game_date'] >= since_date]
@@ -346,31 +313,6 @@ def get_pitcher_stats(df, since_date=None):
         return round(df['hit'].mean(), 2), round(df['xBA'].mean(), 2)
     else:
         return np.nan, np.nan
-
-
-def color_columns(df, min_hits):
-    start_time = time.time() # Start timer
-
-    df_new = df.copy()
-    df_new = df_new[df_new['H_total'] >= min_hits]
-    rwg = ['#F8696B', '#F86B6D', '#F86E70', '#F87173', '#F87476', '#F87779', '#F87A7C', '#F87D7F', '#F88082', '#F88385', '#F88688', '#F8898B', '#F88C8E', '#F98F91', '#F99294', '#F99597', '#F9989A', '#F99A9D', '#F99DA0', '#F9A0A3', '#F9A3A6', '#F9A6A9', '#F9A9AC', '#F9ACAF', '#F9AFB2', '#FAB2B5', '#FAB5B7', '#FAB8BA', '#FABBBD', '#FABEC0', '#FAC1C3', '#FAC4C6', '#FAC7C9', '#FACACC', '#FACCCF', '#FACFD2', '#FAD2D5', '#FAD5D8', '#FBD8DB', '#FBDBDE', '#FBDEE1', '#FBE1E4', '#FBE4E7', '#FBE7EA', '#FBEAED', '#FBEDF0', '#FBF0F3', '#FBF3F6', '#FBF6F9', '#FBF9FC', '#FCFCFF', '#F9FBFD', '#F6FAFA', '#F3F9F8', '#F0F8F5', '#EDF6F2', '#EAF5F0', '#E7F4ED', '#E4F3EA', '#E1F1E8', '#DEF0E5', '#DBEFE2', '#D8EEE0', '#D5ECDD', '#D2EBDB', '#CFEAD8', '#CCE9D5', '#C8E7D3', '#C5E6D0', '#C2E5CD', '#BFE4CB', '#BCE2C8', '#B9E1C5', '#B6E0C3', '#B3DFC0', '#B0DDBD', '#ADDCBB', '#AADBB8', '#A7DAB6', '#A4D9B3', '#A1D7B0', '#9ED6AE', '#9BD5AB', '#98D4A8', '#94D2A6', '#91D1A3', '#8ED0A0', '#8BCF9E', '#88CD9B', '#85CC99', '#82CB96', '#7FCA93', '#7CC891', '#79C78E', '#76C68B', '#73C589', '#70C386', '#6DC283', '#6AC181', '#67C07E', '#63BE7B']
-    gwr = rwg[::-1]
-
-    percentile_columns_prefix = ['H', 'xH_per_G', 'hit_pct', 'x_hit_pct', 'sp_HA_per_BF', 'sp_xHA_per_BF', 'bp_HA_per_BF', 'bp_xHA_per_BF']
-    percentile_columns_exact = ['H_vs_SP', 'xH_vs_SP', 'H_per_PA_vs_L', 'H_per_PA_vs_R', 'H_per_PA_vs_BP', 'H_per_BF_vs_L', 'H_per_BF_vs_R']
-    percentile_columns_all = list()
-    for prefix in percentile_columns_prefix:
-        for suffix in ['total', 'weighted']:
-            percentile_columns_all.append(prefix + '_' + suffix)
-    percentile_columns_all += percentile_columns_exact
-    descending_columns = []
-    for column in percentile_columns_all:
-        if (column in df_new.columns):
-            df_new[column + '_color'] = df_new[column].rank(pct=True)
-            df_new[column + '_color'] = df_new[column + '_color'].fillna('').apply(lambda x: (gwr[math.floor(x * 100)] if column in descending_columns else rwg[math.floor(x * 100)]) if str(x) != '' else '')
-
-    stop_timer('color_columns()', start_time) # Stop timer
-    return df_new
 
 
 def get_weather():

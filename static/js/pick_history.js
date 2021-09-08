@@ -1,7 +1,18 @@
 $(document).ready(function () {
+   var date = new Date();
+   var year = date.getFullYear()
+   var month = date.getMonth() + 1;
+   var day = date.getDate();
+   if (month < 10) {
+      month = '0' + month;
+   }
+   if (day < 10) {
+      day = '0' + day;
+   }
+   var yyyy_mm_dd = [year, month, day].join('-');
    $('table.display#history').DataTable({
       ajax: {
-         url: '/pickHistory'
+         url: '/pickHistory?year=' + year + '&date=' + yyyy_mm_dd
       },
       columns: [
          {

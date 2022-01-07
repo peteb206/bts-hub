@@ -62,10 +62,10 @@ $(document).ready(function () {
       buttons: [
          // 'pageLength',
          {
-            text: 'Advisor',
+            text: 'Hub',
             action: function (e, dt, button, config) {
                $('#historyDiv').hide();
-               $('#advisorDiv').show();
+               $('#hubDiv').show();
             }
          }
       ]

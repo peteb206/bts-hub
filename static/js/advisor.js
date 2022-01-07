@@ -77,7 +77,7 @@ $(document).ready(function () {
 
    var loadWithDate = function (date) {
       $('#selectedDiv').hide();
-      $('#advisorDiv').hide();
+      $('#hubDiv').hide();
       $('#spinnerDiv').removeClass('d-none');
 
       var year = date.getFullYear()
@@ -100,7 +100,7 @@ $(document).ready(function () {
          dataType: 'json',
          // async: false,
          success : function(ajax_data) {
-            $('table.display#advisor').DataTable({
+            $('table.display#hub').DataTable({
                data: ajax_data.rows,
                columns: [
                   {
@@ -212,14 +212,14 @@ $(document).ready(function () {
                   {
                      text: 'Pick History',
                      action: function (e, dt, button, config) {
-                        $('#advisorDiv').hide();
+                        $('#hubDiv').hide();
                         $('#historyDiv').show();
                      }
                   }
                ],
                initComplete: function(oSettings, json) {
                   $('#spinnerDiv').addClass('d-none');
-                  $('#advisorDiv').show();
+                  $('#hubDiv').show();
                   $('#selectedDiv').show();
                },
                rowCallback: function(row, data, index) {

@@ -1,6 +1,11 @@
 import src.py.main as main
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, jsonify, render_template, request, redirect
 app = Flask(__name__)
+
+
+@app.route('/')
+def redirect_to_home():
+    return redirect('/home')
 
 
 @app.route('/home')

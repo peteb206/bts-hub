@@ -7,6 +7,5 @@ pymongo==3.11.0
 python-dotenv==0.17.1
 dnspython==1.16.0
 beautifulsoup4==4.9.3
-lxml==4.6.3
 html5lib==1.1
 statsmodels==0.12.1

@@ -127,7 +127,7 @@ class ScrapeSession:
         start_time = time.time() # Start timer
 
         html = self.session.get('https://www.rotowire.com/baseball/weather.php', headers = self.header).text
-        soup = BeautifulSoup(html, 'lxml')
+        soup = BeautifulSoup(html, 'html.parser')
 
         teams = dict()
         for weather_box in soup.find_all('div', {'class': 'weather-box'}):

@@ -9,3 +9,4 @@ dnspython==1.16.0
 beautifulsoup4==4.10.0
 html5lib==1.1
 statsmodels==0.13.0
+requests-html==0.10.0

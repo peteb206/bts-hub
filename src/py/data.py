@@ -132,7 +132,7 @@ class BTSHubMongoDB:
 
         # Clean up dataframe
         teams_df.rename({'season': 'year', 'id': 'teamId', 'name': 'teamName'}, axis=1, inplace=True)
-        teams_df.sort_values(by=['year', 'teamId', 'playerId'], ignore_index=True, inplace=True)
+        teams_df.sort_values(by=['year', 'teamId'], ignore_index=True, inplace=True)
         return teams_df[['year', 'teamId', 'teamName']]
 
 
@@ -205,7 +205,7 @@ class BTSHubMongoDB:
         df.rename({'game_pk': 'gamePk', 'at_bat_number': 'atBatNumber', 'batter': 'batterId', 'stand': 'batterSide', 'pitcher': 'pitcherId', 'p_throws': 'pitcherHand', 'estimated_ba_using_speedangle': 'xBA'}, inplace=True, axis=1)
         df.drop(['inning_topbot', 'game_date', 'events'], axis=1, inplace=True)
         df.sort_values(['gameDate', 'gamePk', 'inning', 'atBatNumber'], ignore_index=True, inplace=True)
-        return df[['gameDate', 'gamePk', 'inning', 'atBatNumber', 'batterId', 'batterSide', 'pitcherId', 'pitcherHand', 'xBA', 'eventTypeId']]
+        return df[['gamePk', 'gameDate', 'inning', 'atBatNumber', 'batterId', 'batterSide', 'pitcherId', 'pitcherHand', 'xBA', 'eventTypeId']]
 
 
     def __read_statcast_csv(self, month=4):
@@ -238,6 +238,13 @@ class BTSHubMongoDB:
         url = f'https://baseballsavant.mlb.com/statcast_search/csv?{url_params_string}'
         df = pd.read_csv(url, usecols=['game_pk', 'game_date', 'inning_topbot', 'at_bat_number', 'batter', 'stand', 'pitcher', 'p_throws', 'estimated_ba_using_speedangle', 'inning', 'events'])
         return df
+
+
+    def __get_park_factors():
+        session = HTMLSession()
+        r = session.get('https://baseballsavant.mlb.com/leaderboard/statcast-park-factors?type=venue&year=2021&batSide=&stat=index_Hits&condition=Night&rolling=yes')
+        r.html.render()
+        df = pd.read_html(r.html.html)
     ####################################
     ######## End Get From Web ##########
     ####################################
@@ -296,8 +303,9 @@ class BTSHubMongoDB:
 
 if __name__ == '__main__':
     os.environ['DATABASE_CONNECTION'] = input('Database connection: ')
-    db = BTSHubMongoDB(os.environ.get('DATABASE_CONNECTION'), 'bts-hub', date=dt(2021, 12, 31))
-    # print(db.get_eventTypes_from_mlb())
-    # db.clear_collection('eventTypes')
-    # db.update_collection('eventTypes')
-    print(db.get_atBats_from_mlb())
+    db = BTSHubMongoDB(os.environ.get('DATABASE_CONNECTION'), 'bts-hub', date=dt(2015, 12, 31))
+    # display(db.update_collection('eventTypes'))
+    display(db.update_collection('teams'))
+    display(db.update_collection('players'))
+    display(db.update_collection('games'))
+    display(db.update_collection('atBats'))

@@ -347,7 +347,7 @@ if __name__ == '__main__':
     if 'DATABASE_CONNECTION' not in os.environ:
         os.environ['DATABASE_CONNECTION'] = input('Database connection: ')
     db = BTSHubMongoDB(os.environ.get('DATABASE_CONNECTION'), 'bts-hub', date=datetime.now().date()) # sub with dt(<year>, <month>, <day>) as necessary
-    update_type = sys.argv[1] if len(sys.argv) > 1 else os.environ['UPDATE_TYPE'] if 'UPDATE_TYPE' in os.environ else None
+    update_type = sys.argv[1] if len(sys.argv) > 1 else os.environ.get('UPDATE_TYPE') if 'UPDATE_TYPE' in os.environ else None
     while update_type not in ['daily', 'hourly', 'clear']:
         update_type = input('Database update type must be either daily, hourly or clear. Which would you like to perform? ')
 

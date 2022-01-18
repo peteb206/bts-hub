@@ -58,10 +58,10 @@ class BTSHubMongoDB:
                     for pk_tup in info['key']:
                         pks.append(pk_tup[0])
             columns = [col for col in existing_df.columns if col not in pks]
-            combined = pd.merge(existing_df, new_df, how='outer', on=pks, suffixes=['_old', '_new'])
-            combined['existing'] = combined.apply(lambda row: all([row[f'{col}_old'] == row[f'{col}_new'] for col in columns]), axis=1)
+            combined = pd.merge(existing_df, new_df, how='outer', on=pks, suffixes=['_old', '_new'], indicator=True)
+            combined['existing'] = combined.apply(lambda row: (row['_merge'] == 'left_only') | all([row[f'{col}_old'] == row[f'{col}_new'] for col in columns]), axis=1) # Don't mess with rows with identical scraped row and rows where  
             diffs_df = combined[~combined['existing']]
-            diffs_df = diffs_df.drop([col for col in diffs_df.columns if (col.endswith('_old')) | (col == 'existing')], axis=1).rename({f'{col}_new': col for col in columns}, axis=1)
+            diffs_df = diffs_df.drop([col for col in diffs_df.columns if (col.endswith('_old')) | (col in ['_merge', 'existing'])], axis=1).rename({f'{col}_new': col for col in columns}, axis=1)
             print(self.__update_records(collection, pks, columns, diffs_df))
         return self.read_collection(collection)
 
@@ -84,11 +84,11 @@ class BTSHubMongoDB:
                 )
                 if update.matched_count == 0:
                     added += 1
-                    print(f'New record in {collection}:')
+                    # print(f'New record in {collection}:')
                 else:
                     updated += 1
-                    print(f'Updated record in {collection}:')
-                print(record)
+                    # print(f'Updated record in {collection}:')
+                # print(record)
         return f'Added {added} new record(s) and updated {updated} existing record(s) in {collection}.'
 
 

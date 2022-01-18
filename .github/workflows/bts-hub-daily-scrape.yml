@@ -21,4 +21,5 @@ jobs:
             env:
                UPDATE_TYPE: daily
             run: |
+               cd src/py
                python data.py

@@ -1,4 +1,5 @@
 import os
+import sys
 import pymongo
 import requests
 import pandas as pd
@@ -24,6 +25,7 @@ class BTSHubMongoDB:
         # Set info for baseball savant
         self.input_events = list()
         self.output_events = dict()
+        self.session = HTMLSession()
 
 
     ####################################
@@ -103,37 +105,82 @@ class BTSHubMongoDB:
     ####################################
     def get_eventTypes_from_mlb(self):
         # Read example html from Baseball Savant
-        session = HTMLSession()
-        r = session.get('https://baseballsavant.mlb.com/statcast_search?hfPT=&hfAB=triple%5C.%5C.play%7C&hfGT=R%7C&hfPR=&hfZ=&stadium=&hfBBL=&hfNewZones=&hfPull=&hfC=&hfSea=2021%7C&hfSit=&player_type=pitcher&hfOuts=&opponent=&pitcher_throws=&batter_stands=&hfSA=&game_date_gt=&game_date_lt=&hfInfield=&team=&position=&hfOutfield=&hfRO=&home_road=&hfFlag=&hfBBT=&metric_1=&hfInn=&min_pitches=0&min_results=0&group_by=name&sort_col=pitches&player_event_sort=api_p_release_speed&sort_order=desc&min_pas=0#results')
+        r = self.session.get('https://baseballsavant.mlb.com/statcast_search?hfPT=&hfAB=triple%5C.%5C.play%7C&hfGT=R%7C&hfPR=&hfZ=&stadium=&hfBBL=&hfNewZones=&hfPull=&hfC=&hfSea=2021%7C&hfSit=&player_type=pitcher&hfOuts=&opponent=&pitcher_throws=&batter_stands=&hfSA=&game_date_gt=&game_date_lt=&hfInfield=&team=&position=&hfOutfield=&hfRO=&home_road=&hfFlag=&hfBBT=&metric_1=&hfInn=&min_pitches=0&min_results=0&group_by=name&sort_col=pitches&player_event_sort=api_p_release_speed&sort_order=desc&min_pas=0#results')
         r.html.render()
 
         # Calculated columns
+        hit_list = ['single', 'double', 'triple', 'home..run']
+        ball_in_play_list = hit_list + ['field..out', 'double..play', 'field..error', 'grounded..into..double..play', 'fielders..choice', 'fielders..choice..out', 'force..out', 'sac..bunt', 'sac..bunt..double..play', 'sac..fly', 'sac..fly..double..play', 'triple..play']
         soup = BeautifulSoup(r.html.html, 'html.parser')
-        print(soup.find('div', {'class': 'ABresult'}))
         events_list, i = list(), 1
         for event_input in soup.find_all('input', {'class': 'ms_class_AB'}):
             event = event_input['id'].split('_')[-1]
             events_list.append({
                 'eventTypeId': i,
                 'inputEventType': event.replace('..', ' '),
-                'outputEventType': event.replace('..', '_')
+                'outputEventType': event.replace('..', '_'),
+                'inPlayFlag': event in ball_in_play_list,
+                'hitFlag': event in hit_list
             })
             i += 1
         df = pd.DataFrame(events_list)
 
         # Clean up dataframe
-        return df[['eventTypeId', 'inputEventType', 'outputEventType']]
+        return df[['eventTypeId', 'inputEventType', 'outputEventType', 'inPlayFlag', 'hitFlag']]
+
+
+    def get_stadiums_from_mlb(self):
+        # Read json
+        stadiums_dict = self.__get(f'{self.__stats_api_url}/venues')
+        stadiums_df = pd.DataFrame(stadiums_dict['venues'])[['id', 'name']]
+
+        # Clean up dataframe
+        stadiums_df.rename({'id': 'stadiumId', 'name': 'stadiumName'}, axis=1, inplace=True)
+        stadiums_df.sort_values(by='stadiumId', ignore_index=True, inplace=True)
+        return stadiums_df[['stadiumId', 'stadiumName']]
+
+
+    def get_parkFactors_from_mlb(self):
+        park_factors_list = list()
+        for day_night in ['Day', 'Night']:
+            for right_left in ['R', 'L']:
+                r = self.session.get(f'https://baseballsavant.mlb.com/leaderboard/statcast-park-factors?type=venue&batSide={right_left}&stat=index_Hits&condition={day_night}&rolling=no')
+                r.html.render()
+                soup = BeautifulSoup(r.html.html, 'html.parser')
+                table = soup.find('table')
+                thead, tbody = table.find('thead'), table.find('tbody')
+                column_headers = [column_header.text for column_header in thead.find_all('th')]
+                for trow in tbody.find_all('tr'):
+                    col_num, stadium_id = 0, None
+                    for td in trow.find_all('td'):
+                        column_name, td_text = column_headers[col_num], td.text.strip()
+                        if column_name == 'Venue':
+                            a = td.find('a', href=True)
+                            if a:
+                                stadium_id = int(a['href'].split('=')[-1])
+                        elif (stadium_id != None) & (td_text != ''):
+                            park_factors_list.append({
+                                'year': int(column_name),
+                                'stadiumId': stadium_id,
+                                'dayGameFlag': day_night == 'Day',
+                                'rightHandedFlag': right_left == 'R',
+                                'parkFactor': int(td_text)
+                            })
+                        col_num += 1
+        df = pd.DataFrame(park_factors_list)
+        df.sort_values(by=['year', 'stadiumId', 'dayGameFlag', 'rightHandedFlag'], inplace=True)
+        return df
 
 
     def get_teams_from_mlb(self):
         # Read json
         teams_dict = self.__get(f'{self.__stats_api_url}/teams?{self.__stats_api_default_params}&season={self.date.year}')
-        teams_df = pd.DataFrame(teams_dict['teams'])[['season', 'id', 'name']]
+        teams_df = pd.DataFrame(teams_dict['teams'])[['season', 'id', 'abbreviation', 'name']]
 
         # Clean up dataframe
-        teams_df.rename({'season': 'year', 'id': 'teamId', 'name': 'teamName'}, axis=1, inplace=True)
+        teams_df.rename({'season': 'year', 'id': 'teamId', 'abbreviation': 'teamAbbreviation', 'name': 'teamName'}, axis=1, inplace=True)
         teams_df.sort_values(by=['year', 'teamId'], ignore_index=True, inplace=True)
-        return teams_df[['year', 'teamId', 'teamName']]
+        return teams_df[['year', 'teamId', 'teamAbbreviation', 'teamName']]
 
 
     def get_players_from_mlb(self):
@@ -154,7 +201,7 @@ class BTSHubMongoDB:
         players_df['injuredFlag'] = players_df['id'].apply(lambda x: x in injured_players_list)
         players_df.rename({'id': 'playerId', 'fullName': 'playerName', 'currentTeam': 'teamId', 'primaryPosition': 'position', 'batSide': 'bats', 'pitchHand': 'throws'}, axis=1, inplace=True)
         players_df.sort_values(by=['year', 'teamId', 'playerId'], ignore_index=True, inplace=True)
-        return players_df[['year', 'teamId', 'playerId', 'playerName', 'position', 'bats', 'throws', 'injuredFlag']]
+        return players_df[['year', 'playerId', 'teamId', 'playerName', 'position', 'bats', 'throws', 'injuredFlag']]
 
 
     def get_games_from_mlb(self):
@@ -200,12 +247,14 @@ class BTSHubMongoDB:
         df['inningBottomFlag'] = df['inning_topbot'] == 'Bot'
         df['gameDate'] = df['game_date'].apply(lambda x: datetime.strptime(x, '%Y-%m-%d'))
         df['eventTypeId'] = df['events'].apply(lambda x: self.output_events[x])
+        df['rightHandedBatterFlag'] = df['stand'] == 'R'
+        df['rightHandedPitcherFlag'] = df['p_throws'] == 'R'
 
         # Clean up dataframe
-        df.rename({'game_pk': 'gamePk', 'at_bat_number': 'atBatNumber', 'batter': 'batterId', 'stand': 'batterSide', 'pitcher': 'pitcherId', 'p_throws': 'pitcherHand', 'estimated_ba_using_speedangle': 'xBA'}, inplace=True, axis=1)
-        df.drop(['inning_topbot', 'game_date', 'events'], axis=1, inplace=True)
+        df.rename({'game_pk': 'gamePk', 'at_bat_number': 'atBatNumber', 'batter': 'batterId', 'pitcher': 'pitcherId', 'estimated_ba_using_speedangle': 'xBA'}, inplace=True, axis=1)
+        df.drop(['inning_topbot', 'game_date', 'stand', 'p_throws', 'events'], axis=1, inplace=True)
         df.sort_values(['gameDate', 'gamePk', 'inning', 'atBatNumber'], ignore_index=True, inplace=True)
-        return df[['gamePk', 'gameDate', 'inning', 'atBatNumber', 'batterId', 'batterSide', 'pitcherId', 'pitcherHand', 'xBA', 'eventTypeId']]
+        return df[['gamePk', 'gameDate', 'inning', 'atBatNumber', 'batterId', 'rightHandedBatterFlag', 'pitcherId', 'rightHandedPitcherFlag', 'xBA', 'eventTypeId']]
 
 
     def __read_statcast_csv(self, month=4):
@@ -238,13 +287,6 @@ class BTSHubMongoDB:
         url = f'https://baseballsavant.mlb.com/statcast_search/csv?{url_params_string}'
         df = pd.read_csv(url, usecols=['game_pk', 'game_date', 'inning_topbot', 'at_bat_number', 'batter', 'stand', 'pitcher', 'p_throws', 'estimated_ba_using_speedangle', 'inning', 'events'])
         return df
-
-
-    def __get_park_factors():
-        session = HTMLSession()
-        r = session.get('https://baseballsavant.mlb.com/leaderboard/statcast-park-factors?type=venue&year=2021&batSide=&stat=index_Hits&condition=Night&rolling=yes')
-        r.html.render()
-        df = pd.read_html(r.html.html)
     ####################################
     ######## End Get From Web ##########
     ####################################
@@ -302,10 +344,20 @@ class BTSHubMongoDB:
 
 
 if __name__ == '__main__':
-    os.environ['DATABASE_CONNECTION'] = input('Database connection: ')
-    db = BTSHubMongoDB(os.environ.get('DATABASE_CONNECTION'), 'bts-hub', date=dt(2015, 12, 31))
-    # display(db.update_collection('eventTypes'))
-    display(db.update_collection('teams'))
-    display(db.update_collection('players'))
-    display(db.update_collection('games'))
-    display(db.update_collection('atBats'))
+    if 'DATABASE_CONNECTION' not in os.environ:
+        os.environ['DATABASE_CONNECTION'] = input('Database connection: ')
+    db = BTSHubMongoDB(os.environ.get('DATABASE_CONNECTION'), 'bts-hub', date=datetime.now().date()) # sub with dt(<year>, <month>, <day>) as necessary
+    update_type = sys.argv[1] if len(sys.argv) > 1 else os.environ['UPDATE_TYPE'] if 'UPDATE_TYPE' in os.environ else None
+    while update_type not in ['daily', 'hourly', 'clear']:
+        update_type = input('Database update type must be either daily, hourly or clear. Which would you like to perform? ')
+
+    collections = ['eventTypes', 'teams', 'players', 'atBats', 'games', 'stadiums', 'parkFactors'] if update_type in ['daily', 'clear'] else ['games']
+    update_confirmed = None if update_type == 'clear' else 'Y'
+    while update_confirmed not in ['Y', 'N']:
+        update_confirmed = input(f'Are you sure you want to clear out the following collections: {", ".join(collections)}? Y/N: ')
+    if update_confirmed == 'Y':
+        for collection in collections:
+            if update_type == 'clear':
+                print(db.clear_collection(collection))
+            else:
+                print(collection, db.update_collection(collection), sep='\n')

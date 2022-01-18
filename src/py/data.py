@@ -1,4 +1,5 @@
 import os
+from socket import timeout
 import sys
 import pymongo
 import requests
@@ -25,7 +26,6 @@ class BTSHubMongoDB:
         # Set info for baseball savant
         self.input_events = list()
         self.output_events = dict()
-        self.session = HTMLSession()
 
 
     ####################################
@@ -105,13 +105,15 @@ class BTSHubMongoDB:
     ####################################
     def get_eventTypes_from_mlb(self):
         # Read example html from Baseball Savant
-        r = self.session.get('https://baseballsavant.mlb.com/statcast_search?hfPT=&hfAB=triple%5C.%5C.play%7C&hfGT=R%7C&hfPR=&hfZ=&stadium=&hfBBL=&hfNewZones=&hfPull=&hfC=&hfSea=2021%7C&hfSit=&player_type=pitcher&hfOuts=&opponent=&pitcher_throws=&batter_stands=&hfSA=&game_date_gt=&game_date_lt=&hfInfield=&team=&position=&hfOutfield=&hfRO=&home_road=&hfFlag=&hfBBT=&metric_1=&hfInn=&min_pitches=0&min_results=0&group_by=name&sort_col=pitches&player_event_sort=api_p_release_speed&sort_order=desc&min_pas=0#results')
-        r.html.render()
+        session = HTMLSession()
+        r = session.get('https://baseballsavant.mlb.com/statcast_search?hfPT=&hfAB=triple%5C.%5C.play%7C&hfGT=R%7C&hfPR=&hfZ=&stadium=&hfBBL=&hfNewZones=&hfPull=&hfC=&hfSea=2021%7C&hfSit=&player_type=pitcher&hfOuts=&opponent=&pitcher_throws=&batter_stands=&hfSA=&game_date_gt=&game_date_lt=&hfInfield=&team=&position=&hfOutfield=&hfRO=&home_road=&hfFlag=&hfBBT=&metric_1=&hfInn=&min_pitches=0&min_results=0&group_by=name&sort_col=pitches&player_event_sort=api_p_release_speed&sort_order=desc&min_pas=0#results')
+        r.html.render(sleep=10, timeout=10)
 
         # Calculated columns
         hit_list = ['single', 'double', 'triple', 'home..run']
         ball_in_play_list = hit_list + ['field..out', 'double..play', 'field..error', 'grounded..into..double..play', 'fielders..choice', 'fielders..choice..out', 'force..out', 'sac..bunt', 'sac..bunt..double..play', 'sac..fly', 'sac..fly..double..play', 'triple..play']
         soup = BeautifulSoup(r.html.html, 'html.parser')
+        session.close()
         events_list, i = list(), 1
         for event_input in soup.find_all('input', {'class': 'ms_class_AB'}):
             event = event_input['id'].split('_')[-1]
@@ -141,11 +143,11 @@ class BTSHubMongoDB:
 
 
     def get_parkFactors_from_mlb(self):
-        park_factors_list = list()
+        session, park_factors_list = HTMLSession(), list()
         for day_night in ['Day', 'Night']:
             for right_left in ['R', 'L']:
-                r = self.session.get(f'https://baseballsavant.mlb.com/leaderboard/statcast-park-factors?type=venue&batSide={right_left}&stat=index_Hits&condition={day_night}&rolling=no')
-                r.html.render()
+                r = session.get(f'https://baseballsavant.mlb.com/leaderboard/statcast-park-factors?type=venue&batSide={right_left}&stat=index_Hits&condition={day_night}&rolling=no')
+                r.html.render(sleep=10, timeout=10)
                 soup = BeautifulSoup(r.html.html, 'html.parser')
                 table = soup.find('table')
                 thead, tbody = table.find('thead'), table.find('tbody')
@@ -167,6 +169,7 @@ class BTSHubMongoDB:
                                 'parkFactor': int(td_text)
                             })
                         col_num += 1
+        session.close()
         df = pd.DataFrame(park_factors_list)
         df.sort_values(by=['year', 'stadiumId', 'dayGameFlag', 'rightHandedFlag'], inplace=True)
         return df

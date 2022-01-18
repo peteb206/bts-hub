@@ -1,10 +1,11 @@
-name: bts-hub-hourly-scrape
-on: workflow_dispatch
+name: bts-hub-daily-scrape
+on:
+   schedule:
+      - cron: '0 17-23 * * *' # runs each hour between 5:00 PM UTC (11:00 AM CST) and 11:00 PM UTC (5:00 PM CST) each day
+      - cron: '0 0-4 * * *' # runs each hour between 12:00 AM UTC (6:00 PM CST) and 4:00 AM UTC (10:00 PM CST) each day
+   workflow_dispatch:
 jobs:
    build:
-      schedule:
-         - cron: '0 17-23 * * *' # runs each hour between 5:00 PM UTC (11:00 AM CST) and 11:00 PM UTC (5:00 PM CST) each day
-         - cron: '0 0-4 * * *' # runs each hour between 12:00 AM UTC (6:00 PM CST) and 4:00 AM UTC (10:00 PM CST) each day
       runs-on: ubuntu-latest
       steps:
          -  name: checkout repo content

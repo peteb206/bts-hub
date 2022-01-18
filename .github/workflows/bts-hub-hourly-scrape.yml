@@ -1,8 +1,8 @@
 name: bts-hub-hourly-scrape
 on:
-   schedule:
-      - cron: '0 17-23 * * *' # runs each hour between 5:00 PM UTC (11:00 AM CST) and 11:00 PM UTC (5:00 PM CST) each day
-      - cron: '0 0-4 * * *' # runs each hour between 12:00 AM UTC (6:00 PM CST) and 4:00 AM UTC (10:00 PM CST) each day
+   # schedule:
+      # - cron: '0 17-23 * * *' # runs each hour between 5:00 PM UTC (11:00 AM CST) and 11:00 PM UTC (5:00 PM CST) each day
+      # - cron: '0 0-4 * * *' # runs each hour between 12:00 AM UTC (6:00 PM CST) and 4:00 AM UTC (10:00 PM CST) each day
    workflow_dispatch:
 jobs:
    build:
@@ -20,6 +20,7 @@ jobs:
                pip install -r requirements.txt
          -  name: update database with python script
             env:
+               DATABASE_CONNECTION: ${{ secrets.DATABASE_CONNECTION }}
                UPDATE_TYPE: hourly
             run: |
                cd src/py

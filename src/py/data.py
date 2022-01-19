@@ -8,7 +8,7 @@ import json
 from bs4 import BeautifulSoup
 from requests_html import HTMLSession
 from datetime import datetime, date as dt, timedelta
-from dateutil import tz
+import time
 
 
 class BTSHubMongoDB:
@@ -57,12 +57,20 @@ class BTSHubMongoDB:
                 if index != '_id_':
                     for pk_tup in info['key']:
                         pks.append(pk_tup[0])
-            columns = [col for col in existing_df.columns if col not in pks]
-            combined = pd.merge(existing_df, new_df, how='outer', on=pks, suffixes=['_old', '_new'])
-            combined['existing'] = combined.apply(lambda row: all([row[f'{col}_old'] == row[f'{col}_new'] for col in columns]), axis=1)
-            diffs_df = combined[~combined['existing']]
-            diffs_df = diffs_df.drop([col for col in diffs_df.columns if (col.endswith('_old')) | (col == 'existing')], axis=1).rename({f'{col}_new': col for col in columns}, axis=1)
-            print(self.__update_records(collection, pks, columns, diffs_df))
+            columns, change = [col for col in existing_df.columns if col not in pks], False
+            existing_df['_new'] = False
+            new_df['_new'] = True
+            combined_df = pd.concat([existing_df, new_df]).drop_duplicates(subset=pks + columns, keep=False, ignore_index=True)
+            new_records_df= combined_df.drop_duplicates(subset=pks, keep=False).query('_new').reset_index(drop=True)
+            if len(new_records_df.index) > 0:
+                new_records_df, change = new_records_df[pks + columns], True
+                print(self.__add_to_db(collection, new_records_df))
+            updated_records_df = combined_df[combined_df['_new'] & combined_df.duplicated(subset=pks)].copy()
+            if len(updated_records_df.index) > 0:
+                updated_records_df, change = updated_records_df[pks + columns], True
+                print(self.__update_records(collection, pks, columns, updated_records_df))
+            if not change:
+                print(f'No records added to or updated in {collection}.')
         return self.read_collection(collection)
 
 
@@ -76,19 +84,18 @@ class BTSHubMongoDB:
                 update = self.get_db()[collection].update_one(
                     {
                         pk: record[pk] for pk in pks
-                    },
-                    {
+                    }, {
                         '$set': {col: record[col] for col in columns}
                     },
                     upsert = True
                 )
                 if update.matched_count == 0:
                     added += 1
-                    print(f'New record in {collection}:')
+                    # print(f'New record in {collection}:')
                 else:
                     updated += 1
-                    print(f'Updated record in {collection}:')
-                print(record)
+                    # print(f'Updated record in {collection}:')
+                # print(record)
         return f'Added {added} new record(s) and updated {updated} existing record(s) in {collection}.'
 
 
@@ -194,15 +201,15 @@ class BTSHubMongoDB:
 
         # Calculated columns
         players_df['year'] = year
-        players_df['currentTeam'] = players_df['currentTeam'].apply(lambda x: x['id'])
-        players_df['primaryPosition'] = players_df['primaryPosition'].apply(lambda x: x['abbreviation'])
-        players_df['batSide'] = players_df['batSide'].apply(lambda x: x['code'])
-        players_df['pitchHand'] = players_df['pitchHand'].apply(lambda x: x['code'])
+        players_df['teamId'] = players_df['currentTeam'].apply(lambda x: int(x['id']))
+        players_df['position'] = players_df['primaryPosition'].apply(lambda x: x['abbreviation'])
+        players_df['bats'] = players_df['batSide'].apply(lambda x: x['code'])
+        players_df['throws'] = players_df['pitchHand'].apply(lambda x: x['code'])
         injured_players_list = list() # TO DO
+        players_df['injuredFlag'] = players_df['id'].apply(lambda x: x in injured_players_list)
 
         # Clean up dataframe
-        players_df['injuredFlag'] = players_df['id'].apply(lambda x: x in injured_players_list)
-        players_df.rename({'id': 'playerId', 'fullName': 'playerName', 'currentTeam': 'teamId', 'primaryPosition': 'position', 'batSide': 'bats', 'pitchHand': 'throws'}, axis=1, inplace=True)
+        players_df.rename({'id': 'playerId', 'fullName': 'playerName'}, axis=1, inplace=True)
         players_df.sort_values(by=['year', 'teamId', 'playerId'], ignore_index=True, inplace=True)
         return players_df[['year', 'playerId', 'teamId', 'playerName', 'position', 'bats', 'throws', 'injuredFlag']]
 
@@ -215,19 +222,20 @@ class BTSHubMongoDB:
         games_list = list()
         for date in games_dict['dates']:
             games_list += date['games']
-        games_df = pd.DataFrame(games_list)[['gameDate', 'officialDate', 'gamePk', 'teams', 'lineups', 'venue', 'dayNight']]
+        games_df = pd.DataFrame(games_list)[['gameDate', 'officialDate', 'gamePk', 'status', 'teams', 'lineups', 'venue', 'dayNight']]
         for side in ['away', 'home']:
             games_df[f'{side}TeamId'] = games_df['teams'].apply(lambda x: x[side]['team']['id'])
             games_df[f'{side}StarterId'] = games_df['teams'].apply(lambda x: x[side]['probablePitcher']['id'] if 'probablePitcher' in x[side].keys() else 0)
-            games_df[f'{side}Lineup'] = games_df['lineups'].apply(lambda x: [player['id'] for player in x[f'{side}Players']] if isinstance(x, dict) else list())
-        games_df['gameDateTimeUTC'] = games_df['gameDate'].apply(lambda x: datetime.strptime(x, '%Y-%m-%dT%H:%M:%SZ').replace(tzinfo=tz.gettz('UTC')))
+            games_df[f'{side}Lineup'] = games_df['lineups'].apply(lambda x: tuple(player['id'] for player in x[f'{side}Players']) if isinstance(x, dict) else tuple())
+        games_df['gameDateTimeUTC'] = games_df['gameDate'].apply(lambda x: datetime.strptime(x, '%Y-%m-%dT%H:%M:%SZ'))
         games_df['dayGameFlag'] = games_df['dayNight'] == 'day'
         games_df['stadiumId'] = games_df['venue'].apply(lambda x: x['id'])
+        games_df['status'] = games_df['status'].apply(lambda x: x['statusCode'])
         games_df['statcastFlag'] = True # TO DO Merge with atBats data to see if statcast data was collected
 
         # Clean up dataframe
         games_df.sort_values(by=['gamePk', 'gameDateTimeUTC'], ignore_index=True, inplace=True)
-        return games_df[['gamePk', 'gameDateTimeUTC', 'awayTeamId', 'homeTeamId', 'awayStarterId', 'homeStarterId', 'awayLineup', 'homeLineup', 'stadiumId', 'dayGameFlag', 'statcastFlag']]
+        return games_df[['gamePk', 'gameDateTimeUTC', 'status', 'awayTeamId', 'homeTeamId', 'awayStarterId', 'homeStarterId', 'awayLineup', 'homeLineup', 'stadiumId', 'dayGameFlag', 'statcastFlag']]
 
 
     def get_atBats_from_mlb(self):
@@ -257,7 +265,7 @@ class BTSHubMongoDB:
         df.rename({'game_pk': 'gamePk', 'at_bat_number': 'atBatNumber', 'batter': 'batterId', 'pitcher': 'pitcherId', 'estimated_ba_using_speedangle': 'xBA'}, inplace=True, axis=1)
         df.drop(['inning_topbot', 'game_date', 'stand', 'p_throws', 'events'], axis=1, inplace=True)
         df.sort_values(['gameDate', 'gamePk', 'inning', 'atBatNumber'], ignore_index=True, inplace=True)
-        return df[['gamePk', 'gameDate', 'inning', 'atBatNumber', 'batterId', 'rightHandedBatterFlag', 'pitcherId', 'rightHandedPitcherFlag', 'xBA', 'eventTypeId']]
+        return df[['gamePk', 'gameDate', 'atBatNumber', 'inning', 'inningBottomFlag', 'batterId', 'rightHandedBatterFlag', 'pitcherId', 'rightHandedPitcherFlag', 'xBA', 'eventTypeId']]
 
 
     def __read_statcast_csv(self, month=4):
@@ -299,7 +307,11 @@ class BTSHubMongoDB:
     ####### Get From Collection ########
     ####################################
     def read_collection(self, collection, where_dict={}):
-        return pd.DataFrame(list(self.get_db()[collection].find(where_dict, {'_id': False})))
+        df = pd.DataFrame(list(self.get_db()[collection].find(where_dict, {'_id': False})))
+        for col in df.columns:
+            if col.endswith('Lineup'):
+                df[col] = df[col].apply(lambda x: tuple(x))
+        return df
     ####################################
     ##### End Get From Collection ######
     ####################################
@@ -318,8 +330,8 @@ class BTSHubMongoDB:
     ####################################
     ######### Clear Collection #########
     ####################################
-    def clear_collection(self, collection):
-        deleted_records = self.get_db()[collection].delete_many({}).deleted_count
+    def clear_collection(self, collection, where_dict={}):
+        deleted_records = self.get_db()[collection].delete_many(where_dict).deleted_count
         return f'Deleted {deleted_records} record(s) from {collection}.'
     ####################################
     ####### End Clear Collection #######
@@ -349,12 +361,12 @@ class BTSHubMongoDB:
 if __name__ == '__main__':
     if 'DATABASE_CONNECTION' not in os.environ:
         os.environ['DATABASE_CONNECTION'] = input('Database connection: ')
-    db = BTSHubMongoDB(os.environ.get('DATABASE_CONNECTION'), 'bts-hub', date=datetime.now().date()) # sub with dt(<year>, <month>, <day>) as necessary
+    db = BTSHubMongoDB(os.environ.get('DATABASE_CONNECTION'), 'bts-hub', date=dt(2015, 12, 31)) # sub with dt(<year>, <month>, <day>) as necessary
     update_type = sys.argv[1] if len(sys.argv) > 1 else os.environ.get('UPDATE_TYPE') if 'UPDATE_TYPE' in os.environ else None
     while update_type not in ['daily', 'hourly', 'clear']:
         update_type = input('Database update type must be either daily, hourly or clear. Which would you like to perform? ')
 
-    collections = ['eventTypes', 'teams', 'players', 'atBats', 'games', 'stadiums', 'parkFactors'] if update_type in ['daily', 'clear'] else ['games']
+    collections = ['eventTypes', 'teams', 'players', 'games', 'stadiums', 'parkFactors'] if update_type in ['daily', 'clear'] else ['games']
     update_confirmed = None if update_type == 'clear' else 'Y'
     while update_confirmed not in ['Y', 'N']:
         update_confirmed = input(f'Are you sure you want to clear out the following collections: {", ".join(collections)}? Y/N: ')
@@ -362,5 +374,15 @@ if __name__ == '__main__':
         for collection in collections:
             if update_type == 'clear':
                 print(db.clear_collection(collection))
-            else:
+            elif update_type == 'hourly':
                 print(collection, db.update_collection(collection), sep='\n')
+            elif collection in ['teams', 'players', 'games']:
+                for year in range(2015, 2022):
+                    db.date = dt(year, 12, 31)
+                    print('')
+                    print(collection, db.update_collection(collection), sep='\n')
+                    time.sleep(1)
+            else:
+                print('')
+                print(collection, db.update_collection(collection), sep='\n')
+                time.sleep(1)

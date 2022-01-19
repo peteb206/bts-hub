@@ -26,6 +26,12 @@ class BTSHubMongoDB:
         # Set info for baseball savant
         self.input_events = list()
         self.output_events = dict()
+        # Request settings
+        self.session = requests.Session()
+        self.fangraphs_header = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.182 Safari/537.36',
+            'Referer': 'https://www.fangraphs.com/roster-resource/injury-report'
+        }
 
 
     ####################################
@@ -61,7 +67,7 @@ class BTSHubMongoDB:
             existing_df['_new'] = False
             new_df['_new'] = True
             combined_df = pd.concat([existing_df, new_df]).drop_duplicates(subset=pks + columns, keep=False, ignore_index=True)
-            new_records_df= combined_df.drop_duplicates(subset=pks, keep=False).query('_new').reset_index(drop=True)
+            new_records_df= combined_df.drop_duplicates(subset=pks, keep=False).query('_new')
             if len(new_records_df.index) > 0:
                 new_records_df, change = new_records_df[pks + columns], True
                 print(self.__add_to_db(collection, new_records_df))
@@ -102,6 +108,49 @@ class BTSHubMongoDB:
     def __get(self, url):
         request = requests.get(url)
         return json.loads(request.text)
+
+
+    def get_statcast_games(self):
+        agg = self.get_db()['atBats'].aggregate(
+            [
+                {
+                    '$match': {
+                        'xBA': {
+                            '$ne': float('NaN') # filter out NaN xBA values
+                        }
+                    }
+                }, {
+                    '$group': {
+                        '_id': {
+                            'gamePk': '$gamePk',
+                            'gameDate': '$gameDate'
+                        },
+                        'xBA': {
+                            '$sum': "$xBA"
+                        }
+                    }
+                }, {
+                    '$match': {
+                        'xBA': {
+                            '$gt': 0 # return games with xBA sum greater than 0
+                        }
+                    }
+                }
+            ]
+        )
+        df = pd.DataFrame(list(agg))
+        for attr in ['gamePk', 'gameDate']:
+            df[attr] = df['_id'].apply(lambda x: x[attr])
+        df.drop(['_id', 'xBA'], axis=1, inplace=True)
+        df['statcastFlag'] = True
+        return df
+
+
+    def injured_player_ids(self):
+        load_date = self.session.get(f'https://www.fangraphs.com/api/roster-resource/injury-report/loaddate?season={self.date.year}', headers = self.fangraphs_header).text.strip('\"')
+        injuries = json.loads(self.session.get(f'https://cdn.fangraphs.com/api/roster-resource/injury-report/data?loaddate={load_date}&season={self.date.year}', headers = self.fangraphs_header).text)
+        out = [injury['mlbamid'] for injury in injuries if injury['returndate'] == None]
+        return out
     ####################################
     ########### End Helpers ############
     ####################################
@@ -205,7 +254,7 @@ class BTSHubMongoDB:
         players_df['position'] = players_df['primaryPosition'].apply(lambda x: x['abbreviation'])
         players_df['bats'] = players_df['batSide'].apply(lambda x: x['code'])
         players_df['throws'] = players_df['pitchHand'].apply(lambda x: x['code'])
-        injured_players_list = list() # TO DO
+        injured_players_list = self.injured_player_ids() if self.__today.year == self.date.year else list()
         players_df['injuredFlag'] = players_df['id'].apply(lambda x: x in injured_players_list)
 
         # Clean up dataframe
@@ -223,15 +272,18 @@ class BTSHubMongoDB:
         for date in games_dict['dates']:
             games_list += date['games']
         games_df = pd.DataFrame(games_list)[['gameDate', 'officialDate', 'gamePk', 'status', 'teams', 'lineups', 'venue', 'dayNight']]
+        games_df['lineups'] = games_df['lineups'].apply(lambda x: x if isinstance(x, dict) else dict())
         for side in ['away', 'home']:
             games_df[f'{side}TeamId'] = games_df['teams'].apply(lambda x: x[side]['team']['id'])
             games_df[f'{side}StarterId'] = games_df['teams'].apply(lambda x: x[side]['probablePitcher']['id'] if 'probablePitcher' in x[side].keys() else 0)
-            games_df[f'{side}Lineup'] = games_df['lineups'].apply(lambda x: tuple(player['id'] for player in x[f'{side}Players']) if isinstance(x, dict) else tuple())
+            games_df[f'{side}Lineup'] = games_df['lineups'].apply(lambda x: tuple(player['id'] for player in x[f'{side}Players']) if f'{side}Players' in x.keys() else tuple())
         games_df['gameDateTimeUTC'] = games_df['gameDate'].apply(lambda x: datetime.strptime(x, '%Y-%m-%dT%H:%M:%SZ'))
+        games_df['gameDate'] = games_df['gameDateTimeUTC'].apply(lambda x: (x - timedelta(hours=5)).replace(hour=0, minute=0, second=0)) # This should help align with statcast dates
         games_df['dayGameFlag'] = games_df['dayNight'] == 'day'
         games_df['stadiumId'] = games_df['venue'].apply(lambda x: x['id'])
         games_df['status'] = games_df['status'].apply(lambda x: x['statusCode'])
-        games_df['statcastFlag'] = True # TO DO Merge with atBats data to see if statcast data was collected
+        games_df = pd.merge(games_df, self.get_statcast_games(), how='left', on=['gamePk', 'gameDate'])
+        games_df['statcastFlag'].fillna(False, inplace=True)
 
         # Clean up dataframe
         games_df.sort_values(by=['gamePk', 'gameDateTimeUTC'], ignore_index=True, inplace=True)
@@ -361,28 +413,23 @@ class BTSHubMongoDB:
 if __name__ == '__main__':
     if 'DATABASE_CONNECTION' not in os.environ:
         os.environ['DATABASE_CONNECTION'] = input('Database connection: ')
-    db = BTSHubMongoDB(os.environ.get('DATABASE_CONNECTION'), 'bts-hub', date=dt(2015, 12, 31)) # sub with dt(<year>, <month>, <day>) as necessary
+    db = BTSHubMongoDB(os.environ.get('DATABASE_CONNECTION'), 'bts-hub') # add date = dt(<year>, <month>, <day>) as necessary
     update_type = sys.argv[1] if len(sys.argv) > 1 else os.environ.get('UPDATE_TYPE') if 'UPDATE_TYPE' in os.environ else None
     while update_type not in ['daily', 'hourly', 'clear']:
         update_type = input('Database update type must be either daily, hourly or clear. Which would you like to perform? ')
 
-    collections = ['eventTypes', 'teams', 'players', 'games', 'stadiums', 'parkFactors'] if update_type in ['daily', 'clear'] else ['games']
+    collections = ['eventTypes', 'teams', 'players', 'atBats', 'games', 'stadiums', 'parkFactors'] if update_type in ['daily', 'clear'] else ['games']
     update_confirmed = None if update_type == 'clear' else 'Y'
     while update_confirmed not in ['Y', 'N']:
         update_confirmed = input(f'Are you sure you want to clear out the following collections: {", ".join(collections)}? Y/N: ')
+
     if update_confirmed == 'Y':
         for collection in collections:
             if update_type == 'clear':
                 print(db.clear_collection(collection))
             elif update_type == 'hourly':
                 print(collection, db.update_collection(collection), sep='\n')
-            elif collection in ['teams', 'players', 'games']:
-                for year in range(2015, 2022):
-                    db.date = dt(year, 12, 31)
-                    print('')
-                    print(collection, db.update_collection(collection), sep='\n')
-                    time.sleep(1)
             else:
-                print('')
                 print(collection, db.update_collection(collection), sep='\n')
-                time.sleep(1)
+                print()
+                time.sleep(5)

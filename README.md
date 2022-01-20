@@ -12,4 +12,4 @@ If the following error is raised, run app.py like a regular python program to se
 ```
 Error: While importing 'app', an ImportError was raised.
 ```
-http://localhost:\<port\>
+http://localhost:<port\>

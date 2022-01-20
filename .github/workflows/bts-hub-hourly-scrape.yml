@@ -21,7 +21,6 @@ jobs:
          -  name: update database with python script
             env:
                DATABASE_CONNECTION: ${{ secrets.DATABASE_CONNECTION }}
-               UPDATE_TYPE: hourly
             run: |
                cd app
-               python data.py
+               python data.py hourly

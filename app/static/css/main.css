@@ -1,3 +1,8 @@
+body {
+    font-family: 'Open Sans';
+    color: #165916;
+    background-color: #E8E8E8;
+}
 a {
     text-decoration: none;
 }
@@ -7,7 +12,7 @@ th, td {
 }
 img {
     position: absolute;
-    top: 0px;
+    /* top: 0px; */
     left: 0px;
     padding: 0px;
     max-width: 200px;
@@ -20,6 +25,12 @@ img.shrunk{
 }
 .center-text {
     text-align: center;
+}
+.vertical-center {
+    min-height: 100%;
+    min-height: 100vh; 
+    display: flex;
+    align-items: center;
 }
 .hidden {
     display: none;
@@ -37,7 +48,7 @@ img.shrunk{
     max-width: 200px;
     min-height: 100vh;
     background: #165916;
-    color: #fff;
+    color: #E8E8E8;
     /* transition: all 0.3s; */
 }
 #sidebar.collapsed {
@@ -47,6 +58,8 @@ img.shrunk{
 #sidebarCollapse, #sidebarCollapsed {
     position: fixed;
     bottom: 20px;
+    color: #165916;
+    background-color: #E8E8E8;
 }
 .buttonText {
     margin-left: 10px;
@@ -61,12 +74,13 @@ a, a:hover, a:focus {
     padding-bottom: 10px;
     background: #165916;
 }
-#fullSidebarHeader {
-    padding-top: 120px;
+#partialSidebarHeader {
+    padding: 5px;
 }
 #sidebar ul.components {
     padding: 20px 0;
-    border-bottom: 1px solid #47748b;
+    border-top: 1px solid #D3D3D3;
+    border-bottom: 1px solid #D3D3D3;
 }
 #sidebar ul li a {
     padding: 10px;
@@ -80,4 +94,9 @@ a, a:hover, a:focus {
 #sidebar ul li.active {
     color: #165916;
     background: #D3D3D3;
+    border-left: 3px solid #165916;
+    border-right: 3px solid #165916;
+}
+#spinnerDiv {
+    background-color: #D3D3D3;
 }

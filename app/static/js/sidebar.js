@@ -14,6 +14,7 @@ $(document).ready(function () {
             'hidden': {
                 '#sidebarCollapseText': true,
                 '#fullSidebarHeader': true,
+                '#partialSidebarHeader': false,
                 '#sidebarCollapse': true,
                 '#sidebarCollapsed': false,
                 '.fullSidebarTab': true,

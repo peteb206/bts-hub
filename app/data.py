@@ -53,9 +53,10 @@ class BTSHubMongoDB:
         return f'Added {len(records)} new record(s) to {collection}.'
 
 
-    def __update_db(self, collection, existing_df, new_df):
+    def __update_db(self, collection, existing_df, new_df, return_collection=False):
         if len(existing_df.columns) * len(existing_df.index) == 0: # Empty database collection
             print(self.__add_to_db(collection, new_df))
+            print(new_df)
         else:
             # Find primary key(s) and column(s) of collection
             indices, pks = self.get_db()[collection].index_information(), list()
@@ -71,13 +72,28 @@ class BTSHubMongoDB:
             if len(new_records_df.index) > 0:
                 new_records_df, change = new_records_df[pks + columns], True
                 print(self.__add_to_db(collection, new_records_df))
+                print(new_records_df)
             updated_records_df = combined_df[combined_df['_new'] & combined_df.duplicated(subset=pks)].copy()
             if len(updated_records_df.index) > 0:
                 updated_records_df, change = updated_records_df[pks + columns], True
                 print(self.__update_records(collection, pks, columns, updated_records_df))
+                print(updated_records_df)
             if not change:
                 print(f'No records added to or updated in {collection}.')
-        return self.read_collection(collection)
+
+        # Update lastUpdate time in lastUpdate collection
+        self.get_db()['lastUpdate'].update_one(
+            {
+                'collection': collection
+            }, {
+                '$set': {
+                    'lastUpdate': datetime.utcnow()
+                }
+            },
+            upsert = True
+        )
+        if return_collection:
+            return self.read_collection(collection)
 
 
     def __update_records(self, collection, pks, columns, records):
@@ -91,17 +107,16 @@ class BTSHubMongoDB:
                     {
                         pk: record[pk] for pk in pks
                     }, {
-                        '$set': {col: record[col] for col in columns}
+                        '$set': {
+                            col: record[col] for col in columns
+                        }
                     },
                     upsert = True
                 )
                 if update.matched_count == 0:
                     added += 1
-                    # print(f'New record in {collection}:')
                 else:
                     updated += 1
-                    # print(f'Updated record in {collection}:')
-                # print(record)
         return f'Added {added} new record(s) and updated {updated} existing record(s) in {collection}.'
 
 
@@ -372,8 +387,8 @@ class BTSHubMongoDB:
     ####################################
     ######## Update Collection #########
     ####################################
-    def update_collection(self, collection):
-        return self.__update_db(collection, self.read_collection(collection), eval(f'self.get_{collection}_from_mlb()'))
+    def update_collection(self, collection, return_collection=False):
+        return self.__update_db(collection, self.read_collection(collection), eval(f'self.get_{collection}_from_mlb()'), return_collection=return_collection)
     ####################################
     ###### End Update Collection #######
     ####################################
@@ -411,25 +426,30 @@ class BTSHubMongoDB:
 
 
 if __name__ == '__main__':
+    pd.set_option('display.max_columns', None)
+    pd.set_option('display.max_rows', None)
+    pd.set_option('expand_frame_repr', False)
     if 'DATABASE_CONNECTION' not in os.environ:
         os.environ['DATABASE_CONNECTION'] = input('Database connection: ')
     db = BTSHubMongoDB(os.environ.get('DATABASE_CONNECTION'), 'bts-hub') # add date = dt(<year>, <month>, <day>) as necessary
-    update_type = sys.argv[1] if len(sys.argv) > 1 else os.environ.get('UPDATE_TYPE') if 'UPDATE_TYPE' in os.environ else None
+
+    update_type, update_confirmed, collections = sys.argv[1] if len(sys.argv) > 1 else None, 'Y', ['games']
     while update_type not in ['daily', 'hourly', 'clear']:
         update_type = input('Database update type must be either daily, hourly or clear. Which would you like to perform? ')
 
-    collections = ['eventTypes', 'teams', 'players', 'atBats', 'games', 'stadiums', 'parkFactors'] if update_type in ['daily', 'clear'] else ['games']
-    update_confirmed = None if update_type == 'clear' else 'Y'
-    while update_confirmed not in ['Y', 'N']:
-        update_confirmed = input(f'Are you sure you want to clear out the following collections: {", ".join(collections)}? Y/N: ')
+    if update_type in ['daily', 'clear']:
+        collections = ['eventTypes', 'teams', 'players', 'atBats'] + collections + ['stadiums', 'parkFactors']
+        if update_type == 'clear':
+            update_confirmed = None
+            while update_confirmed not in ['Y', 'N']:
+                update_confirmed = input(f'Are you sure you want to clear out the following collections: {", ".join(collections)}? Y/N: ')
 
     if update_confirmed == 'Y':
         for collection in collections:
             if update_type == 'clear':
                 print(db.clear_collection(collection))
             elif update_type == 'hourly':
-                print(collection, db.update_collection(collection), sep='\n')
+                db.update_collection(collection)
             else:
-                print(collection, db.update_collection(collection), sep='\n')
-                print()
+                db.update_collection(collection)
                 time.sleep(5)

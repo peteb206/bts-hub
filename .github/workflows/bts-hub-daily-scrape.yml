@@ -22,5 +22,5 @@ jobs:
                DATABASE_CONNECTION: ${{ secrets.DATABASE_CONNECTION }}
                UPDATE_TYPE: daily
             run: |
-               cd src/py
+               cd app
                python data.py

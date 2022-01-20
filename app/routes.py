@@ -1,7 +1,6 @@
-import src.py.main as main
-from flask import Flask, jsonify, render_template, request, redirect
+from app import app
+from flask import jsonify, render_template, request, redirect
 import datetime
-app = Flask(__name__)
 
 ####################################
 ########### HTML Pages #############
@@ -17,8 +16,8 @@ def dashboard():
     if date_arg:
         return render_template('dashboard.html')
     else:
-        date_string = (datetime.datetime.now() - datetime.timedelta(hours=6).strftime('%Y-%m-%d'))
-        redirect(f'/dashboard?date={date_string}')
+        date_string = (datetime.datetime.now() - datetime.timedelta(hours=6)).strftime('%Y-%m-%d')
+        return redirect(f'/dashboard?date={date_string}')
 ####################################
 ######### End HTML Pages ###########
 ####################################

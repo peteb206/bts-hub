@@ -1,18 +1,31 @@
 import src.py.main as main
 from flask import Flask, jsonify, render_template, request, redirect
+import datetime
 app = Flask(__name__)
 
-
+####################################
+########### HTML Pages #############
+####################################
 @app.route('/')
 def redirect_to_home():
-    return redirect('/home')
+    return redirect('/dashboard')
 
 
-@app.route('/home')
-def home():
-    return render_template('index.html')
+@app.route('/dashboard')
+def dashboard():
+    date_arg = request.args.get('date')
+    if date_arg:
+        return render_template('dashboard.html')
+    else:
+        date_string = (datetime.datetime.now() - datetime.timedelta(hours=6).strftime('%Y-%m-%d'))
+        redirect(f'/dashboard?date={date_string}')
+####################################
+######### End HTML Pages ###########
+####################################
 
-
+####################################
+######### JSON Endpoints ###########
+####################################
 @app.route('/loadTableData')
 def load_table_data():
     date_arg = request.args.get('date')
@@ -35,3 +48,6 @@ def game_logs():
     player_id = request.args.get(player_type)
     season = request.args.get('year')
     return jsonify(main.game_logs(player_type=player_type, player_id=player_id, season=season))
+####################################
+####### End JSON Endpoints #########
+####################################

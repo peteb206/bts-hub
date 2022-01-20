@@ -1,10 +1,83 @@
-.border_left {
-    border-left: 2px solid;
+a {
+    text-decoration: none;
 }
 th, td {
     white-space: nowrap;
-    text-align: center
+    text-align: center;
+}
+img {
+    position: absolute;
+    top: 0px;
+    left: 0px;
+    padding: 0px;
+    max-width: 200px;
+}
+img.shrunk{
+    max-width: 70px;
+}
+.border_left {
+    border-left: 2px solid;
+}
+.center-text {
+    text-align: center;
+}
+.hidden {
+    display: none;
+}
+.wrapper {
+    display: flex;
+    width: 100%;
+    align-items: stretch;
 }
 #main-content {
     font-size: 13px;
+}
+#sidebar {
+    min-width: 200px;
+    max-width: 200px;
+    min-height: 100vh;
+    background: #165916;
+    color: #fff;
+    /* transition: all 0.3s; */
+}
+#sidebar.collapsed {
+    min-width: 70px;
+    max-width: 70px;
+}
+#sidebarCollapse, #sidebarCollapsed {
+    position: fixed;
+    bottom: 20px;
+}
+.buttonText {
+    margin-left: 10px;
+}
+a, a:hover, a:focus {
+    color: inherit;
+    text-decoration: none;
+    transition: all 0.3s;
+}
+#sidebar .sidebar-header {
+    padding: 20px;
+    padding-bottom: 10px;
+    background: #165916;
+}
+#fullSidebarHeader {
+    padding-top: 120px;
+}
+#sidebar ul.components {
+    padding: 20px 0;
+    border-bottom: 1px solid #47748b;
+}
+#sidebar ul li a {
+    padding: 10px;
+    font-size: 1.1em;
+    display: block;
+}
+#sidebar ul li a:hover {
+    color: #165916;
+    background: #D3D3D3;
+}
+#sidebar ul li.active {
+    color: #165916;
+    background: #D3D3D3;
 }

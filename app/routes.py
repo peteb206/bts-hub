@@ -16,8 +16,22 @@ def dashboard():
     if date_arg:
         return render_template('dashboard.html')
     else:
-        date_string = (datetime.datetime.now() - datetime.timedelta(hours=6)).strftime('%Y-%m-%d')
+        date_string = (datetime.datetime.now() - datetime.timedelta(hours=5)).strftime('%Y-%m-%d')
         return redirect(f'/dashboard?date={date_string}')
+
+
+@app.route('/picks')
+@app.route('/games')
+@app.route('/players')
+@app.route('/teams')
+@app.route('/stadiums')
+def picks():
+    return render_template(f'data_view.html')
+
+
+@app.route('/links')
+def links():
+    return render_template('links.html')
 ####################################
 ######### End HTML Pages ###########
 ####################################

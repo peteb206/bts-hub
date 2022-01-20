@@ -2,6 +2,7 @@
 <html>
    <head>
       <title id="title">Beat the Streak Hub</title>
+      <!-- CSS -->
       <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.0/dist/css/bootstrap.min.css" integrity="sha384-KyZXEAg3QhqLMpG8r+8fhAXLRk2vvoC2f3B09zVXn8CA5QIVfZOJ3BCsw2P0p/We" crossorigin="anonymous">
       <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.10.23/css/jquery.dataTables.css">
       <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/buttons/1.6.5/css/buttons.dataTables.min.css">
@@ -11,6 +12,7 @@
       <link rel="stylesheet" type="text/css" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
       <link rel="stylesheet" type="text/css" href="{{url_for('static', filename='css/main.css')}}">
 
+      <!-- JS -->
       <script type="text/javascript" charset="utf8" src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.0/dist/js/bootstrap.bundle.min.js" integrity="sha384-U1DAWAznBHeqEIlVSCgzq+c9gqGAJn5c/t99JyeKa9xxaYpSvHU5awsuZVVFIhvj" crossorigin="anonymous"></script>
       <script type="text/javascript" charset="utf8" src="https://code.jquery.com/jquery-3.5.1.js"></script>
       <script type="text/javascript" charset="utf8" src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
@@ -18,15 +20,13 @@
       <!-- <script type="text/javascript" charset="utf8" src="https://cdn.datatables.net/fixedcolumns/3.3.3/js/dataTables.fixedColumns.min.js"></script> -->
       <script type="text/javascript" charset="utf8" src="https://cdn.datatables.net/buttons/1.7.1/js/dataTables.buttons.min.js"></script>
       <script type="text/javascript" charset="utf8" src="https://cdn.datatables.net/buttons/1.7.1/js/buttons.html5.min.js"></script>
+      <script type="text/javascript" charset="utf8" src="{{url_for('static', filename='js/links.js')}}"></script>
       <script type="text/javascript" charset="utf8" src="{{url_for('static', filename='js/sidebar.js')}}"></script>
-      <!-- <script type="text/javascript" charset="utf8" src="{{url_for('static', filename='js/buildDataTable.js')}}"></script> -->
+      <script type="text/javascript" charset="utf8" src="{{url_for('static', filename='js/buildDataTable.js')}}"></script>
 
       <!-- Font Awesome JS -->
       <script defer src="https://use.fontawesome.com/releases/v5.0.13/js/solid.js" integrity="sha384-tzzSw1/Vo+0N5UhStP3bvwWPq+uvzCMfrN1fEFe+xBmv1C/AtVX5K0uZtmcHitFZ" crossorigin="anonymous"></script>
       <script defer src="https://use.fontawesome.com/releases/v5.0.13/js/fontawesome.js" integrity="sha384-6OIrr52G08NpOFSZdxxz1xdNSndlD4vdcf/q2myIUVO0VsqaGHJsB0RaBE01VTOY" crossorigin="anonymous"></script>
-
-      <!-- Popper.JS -->
-      <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.0/umd/popper.min.js" integrity="sha384-cs/chFZiN24E4KMATLdqdvsezGxaGsi4hLGOzlXwp5UZB1LY//20VyM2taTB4QvJ" crossorigin="anonymous"></script>
    </head>
 
    <body>
@@ -37,58 +37,14 @@
                <h3 id="fullSidebarHeader">Beat the Streak Hub</h3>
             </div>
 
-            <ul class="list-unstyled components">
-               <li class="active">
-                  <a href="#">
-                     <div class="fullSidebarTab">
-                        <i class="fas fa-home"></i>
-                        <span class="buttonText">Dashboard</span>
-                     </div>
-                     <div class="container-fluid partialSidebarTab hidden">
-                        <i class="fas fa-home fa-lg"></i>
-                     </div>
-                  </a>
-               </li>
-               <li>
-                  <a href="#">
-                     <div class="fullSidebarTab">
-                        <i class="fas fa-pencil-alt"></i>
-                        <span class="buttonText">My Picks</span>
-                     </div>
-                     <div class="container-fluid partialSidebarTab hidden">
-                        <i class="fas fa-pencil-alt fa-lg"></i>
-                     </div>
-                  </a>
-               </li>
-               <li>
-                  <a href="#">
-                     <div class="fullSidebarTab">
-                        <i class="fas fa-database"></i>
-                        <span class="buttonText">Data</span>
-                     </div>
-                     <div class="container-fluid partialSidebarTab hidden">
-                        <i class="fas fa-database fa-lg"></i>
-                     </div>
-                  </a>
-               </li>
-               <li>
-                  <a href="#">
-                     <div class="fullSidebarTab">
-                        <i class="fas fa-link"></i>
-                        <span class="buttonText">Links</span>
-                     </div>
-                     <div class="container-fluid partialSidebarTab hidden">
-                        <i class="fas fa-link fa-lg"></i>
-                     </div>
-                  </a>
-               </li>
+            <ul id="sidebarTabs" class="list-unstyled components">
             </ul>
             <div class="container-fluid">
                <button type="button" id="sidebarCollapse" class="btn btn-secondary">
                   <i class="fas fa-angle-double-left"></i>
                   <span class="buttonText">Collapse Sidebar</span>
                </button>
-               <button type="button" id="sidebarCollapsed" class="btn btn-secondary hidden">
+               <button type="button" id="sidebarCollapsed" class="btn btn-secondary hidden" title="Expand Sidebar">
                   <i class="fas fa-angle-double-right"></i>
                </button>
             </div>

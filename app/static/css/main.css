@@ -12,13 +12,9 @@ th, td {
 }
 img {
     position: absolute;
-    /* top: 0px; */
     left: 0px;
     padding: 0px;
     max-width: 200px;
-}
-img.shrunk{
-    max-width: 70px;
 }
 .border_left {
     border-left: 2px solid;
@@ -40,6 +36,9 @@ img.shrunk{
     width: 100%;
     align-items: stretch;
 }
+.spinner-grow {
+    margin-bottom: 10px;
+}
 #main-content {
     font-size: 13px;
 }
@@ -57,7 +56,7 @@ img.shrunk{
 }
 #sidebarCollapse, #sidebarCollapsed {
     position: fixed;
-    bottom: 20px;
+    bottom: 10px;
     color: #165916;
     background-color: #E8E8E8;
 }
@@ -99,4 +98,9 @@ a, a:hover, a:focus {
 }
 #spinnerDiv {
     background-color: #D3D3D3;
+}
+#spinner {
+    width: 5rem;
+    height: 5rem;
+    animation-duration: 1s;
 }

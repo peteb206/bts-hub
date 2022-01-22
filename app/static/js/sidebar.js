@@ -12,26 +12,24 @@ $(document).ready(function () {
     let sidebarToggle = function () {
         let classMap = {
             'hidden': {
-                '#sidebarCollapseText': true,
                 '#fullSidebarHeader': true,
                 '#partialSidebarHeader': false,
                 '#sidebarCollapse': true,
                 '#sidebarCollapsed': false,
                 '.fullSidebarTab': true,
                 '.partialSidebarTab': false,
-                '.buttonText': true
-            },
-            'shrunk': {
+                '.buttonText': true,
                 'img': true
             }
         }
 
         $('#sidebar').toggleClass('collapsed');
-        var shrinkMenu = $('#sidebar').hasClass('collapsed');
+        var collapseSidebar = $('#sidebar').hasClass('collapsed');
+        $(document).attr('cookie', 'collapseSidebar=' + collapseSidebar);
 
         $.each(classMap, function (className, elements) {
             $.each(elements, function (element, bool) {
-                if (shrinkMenu) {
+                if (collapseSidebar) {
                     // Collapse sidebar menu
                     if (bool) {
                         addClass($(element), className);
@@ -51,5 +49,8 @@ $(document).ready(function () {
     };
     $('#sidebarCollapse').on('click', sidebarToggle);
     $('#sidebarCollapsed').on('click', sidebarToggle);
-    // $(window).resize(sidebarToggle(false)).trigger('resize');
+    let collapseSidebar = parseCookie('collapseSidebar') === 'true';
+    if (($('#sidebar').hasClass('collapsed') & !collapseSidebar) | (!$('#sidebar').hasClass('collapsed') & collapseSidebar)) {
+        sidebarToggle();
+    }
 });

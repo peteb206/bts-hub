@@ -2,6 +2,7 @@ import datetime
 import time
 from dateutil import tz
 import numpy as np
+import json
 import pandas as pd
 
 
@@ -92,3 +93,20 @@ def string_columns(df, columns):
         if col in df.columns:
             df[col] = df[col].fillna('').astype(str)
     return df
+
+
+def parseRequestArguments(args):
+    args_dict = dict()
+    for key, value in args.items():
+        if key != '_':
+            if value.isdigit():
+                value = int(value)
+            elif value.replace('.', '', 1).isdigit():
+                value = float(value)
+            elif (value[0] == '{') & (value[-1] == '}'):
+                try:
+                    value = json.loads(value)
+                except json.decoder.JSONDecodeError:
+                    value = value
+            args_dict[key] = value
+    return args_dict

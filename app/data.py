@@ -1,5 +1,4 @@
 import os
-from socket import timeout
 import sys
 import pymongo
 import requests
@@ -374,11 +373,15 @@ class BTSHubMongoDB:
     ####### Get From Collection ########
     ####################################
     def read_collection(self, collection, where_dict={}):
-        df = pd.DataFrame(list(self.get_db()[collection].find(where_dict, {'_id': False})))
+        df = pd.DataFrame(self.read_collection_as_list(collection, where_dict=where_dict))
         for col in df.columns:
             if col.endswith('Lineup'):
                 df[col] = df[col].apply(lambda x: tuple(x))
         return df
+
+
+    def read_collection_as_list(self, collection, where_dict={}):
+        return list(self.get_db()[collection].find(where_dict, {'_id': False}))
     ####################################
     ##### End Get From Collection ######
     ####################################
@@ -429,9 +432,9 @@ if __name__ == '__main__':
     pd.set_option('display.max_columns', None)
     pd.set_option('display.max_rows', None)
     pd.set_option('expand_frame_repr', False)
-    if 'DATABASE_CONNECTION' not in os.environ:
-        os.environ['DATABASE_CONNECTION'] = input('Database connection: ')
-    db = BTSHubMongoDB(os.environ.get('DATABASE_CONNECTION'), 'bts-hub') # add date = dt(<year>, <month>, <day>) as necessary
+    if 'DATABASE_CLIENT' not in os.environ:
+        os.environ['DATABASE_CLIENT'] = input('Database connection: ')
+    db = BTSHubMongoDB(os.environ.get('DATABASE_CLIENT'), 'bts-hub') # add date = dt(<year>, <month>, <day>) as necessary
 
     update_type, update_confirmed, collections = sys.argv[1] if len(sys.argv) > 1 else None, 'Y', ['games']
     while update_type not in ['daily', 'hourly', 'clear']:

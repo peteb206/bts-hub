@@ -21,9 +21,9 @@
       <!-- <script type="text/javascript" charset="utf8" src="https://cdn.datatables.net/fixedcolumns/3.3.3/js/dataTables.fixedColumns.min.js"></script> -->
       <script type="text/javascript" charset="utf8" src="https://cdn.datatables.net/buttons/1.7.1/js/dataTables.buttons.min.js"></script>
       <script type="text/javascript" charset="utf8" src="https://cdn.datatables.net/buttons/1.7.1/js/buttons.html5.min.js"></script>
-      <script type="text/javascript" charset="utf8" src="{{url_for('static', filename='js/links.js')}}"></script>
+      <script type="text/javascript" charset="utf8" src="{{url_for('static', filename='js/hubFunctions.js')}}"></script>
       <script type="text/javascript" charset="utf8" src="{{url_for('static', filename='js/sidebar.js')}}"></script>
-      <script type="text/javascript" charset="utf8" src="{{url_for('static', filename='js/buildDataTable.js')}}"></script>
+      <script type="text/javascript" charset="utf8" src="{{url_for('static', filename='js/links.js')}}"></script>
 
       <!-- Font Awesome JS -->
       <script defer src="https://use.fontawesome.com/releases/v5.0.13/js/solid.js" integrity="sha384-tzzSw1/Vo+0N5UhStP3bvwWPq+uvzCMfrN1fEFe+xBmv1C/AtVX5K0uZtmcHitFZ" crossorigin="anonymous"></script>
@@ -32,40 +32,42 @@
 
    <body>
       <div class="wrapper">
-         <nav id="sidebar">
-            <div id="fullSidebarHeader" class="sidebar-header text-center">
+         <nav id="sidebar" class="collapsed">
+            <div id="fullSidebarHeader" class="sidebar-header text-center hidden">
                <h3>Beat the Streak Hub</h3>
             </div>
-            <div id="partialSidebarHeader" class="text-center hidden">
+            <div id="partialSidebarHeader" class="text-center">
                <h3>BTS Hub</h3>
             </div>
 
             <ul id="sidebarTabs" class="list-unstyled components">
             </ul>
             <div class="container-fluid">
-               <img src="{{url_for('static', filename='img/rogers_centre.jpeg')}}">
-               <button type="button" id="sidebarCollapse" class="btn btn-secondary">
+               <img src="{{url_for('static', filename='img/rogers_centre.jpeg')}}" class="hidden">
+               <button type="button" id="sidebarCollapse" class="btn btn-secondary hidden">
                   <i class="fas fa-angle-double-left"></i>
-                  <span class="buttonText">Collapse Sidebar</span>
+                  <span class="buttonText hidden">Collapse Sidebar</span>
                </button>
-               <button type="button" id="sidebarCollapsed" class="btn btn-secondary hidden" title="Expand Sidebar">
+               <button type="button" id="sidebarCollapsed" class="btn btn-secondary" title="Expand Sidebar">
                   <i class="fas fa-angle-double-right"></i>
                </button>
             </div>
          </nav>
-         <div class="container-fluid" id="content">
+         <div class="container-fluid">
             <div id="spinnerDiv" class="row vertical-center">
                <div class="d-flex flex-column align-items-center">
                   <div class="row">
-                     <div class="spinner-border" role="status"></div>
+                     <div id="spinner" class="spinner-grow" role="status"></div>
                   </div>
                   <div class="row">
                      <strong id="loadingText"></strong>
                   </div>
                </div>
             </div>
-            {% block content %}
-            {% endblock %}
+            <div id="content" class="hidden">
+               {% block content %}
+               {% endblock %}
+            </div>
          </div>
       </div>
    </body>

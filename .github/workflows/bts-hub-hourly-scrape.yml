@@ -20,7 +20,7 @@ jobs:
                pip install -r requirements.txt
          -  name: update database with python script
             env:
-               DATABASE_CONNECTION: ${{ secrets.DATABASE_CONNECTION }}
+               DATABASE_CLIENT: ${{ secrets.DATABASE_CLIENT }}
             run: |
                cd app
                python data.py hourly

@@ -8,6 +8,7 @@ from bs4 import BeautifulSoup
 from requests_html import HTMLSession
 from datetime import datetime, date as dt, timedelta
 import time
+from app.utils import html_table
 
 
 class BTSHubMongoDB:
@@ -41,7 +42,7 @@ class BTSHubMongoDB:
 
 
     def __add_to_db(self, collection, records):
-        assert (isinstance(records, pd.DataFrame)) | isinstance(records, list)
+        assert isinstance(records, (pd.DataFrame, list))
         if isinstance(records, list):
             pass
         elif isinstance(records, pd.DataFrame):
@@ -96,7 +97,7 @@ class BTSHubMongoDB:
 
 
     def __update_records(self, collection, pks, columns, records):
-        assert (isinstance(records, pd.DataFrame)) | isinstance(records, list)
+        assert isinstance(records, (pd.DataFrame, list))
         if isinstance(records, pd.DataFrame):
             records = records.to_dict('records')
         if isinstance(records, list):
@@ -382,6 +383,10 @@ class BTSHubMongoDB:
 
     def read_collection_as_list(self, collection, where_dict={}):
         return list(self.get_db()[collection].find(where_dict, {'_id': False}))
+
+
+    def read_collection_to_html_table(self, collection, where_dict={}):
+        return html_table('dataView', self.read_collection_as_list(collection, where_dict=where_dict))
     ####################################
     ##### End Get From Collection ######
     ####################################
@@ -427,6 +432,24 @@ class BTSHubMongoDB:
     # End Rename Column in Collection ##
     ####################################
 
+
+    ####################################
+    ###### Collection Information ######
+    ####################################
+    def collection_columns(self, collection):
+        one_document, columns_with_info = self.get_db()[collection].find_one({}, {'_id': False}), dict()
+        if one_document:
+            columns = list(one_document.keys())
+            for column in columns:
+                column_value = one_document[column]
+                columns_with_info[column] = type(column_value).__name__
+        return {
+            'collection': collection,
+            'columns': columns_with_info
+        }
+    ####################################
+    #### End Collection Information ####
+    ####################################
 
 if __name__ == '__main__':
     pd.set_option('display.max_columns', None)

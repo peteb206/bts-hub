@@ -69,7 +69,3 @@ $(window).on('load', function () {
     $('#spinnerDiv').addClass('hidden');
     $('#content').removeClass('hidden');
 });
-
-$(document).ready(function () {
-    $('#loadingText').text('Loading ' + $(location).attr('pathname').replace('/', '') + '...');
-});

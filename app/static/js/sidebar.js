@@ -18,7 +18,6 @@ $(document).ready(function () {
                 '#sidebarCollapsed': false,
                 '.fullSidebarTab': true,
                 '.partialSidebarTab': false,
-                '.buttonText': true,
                 'img': true
             }
         }
@@ -49,8 +48,8 @@ $(document).ready(function () {
     };
     $('#sidebarCollapse').on('click', sidebarToggle);
     $('#sidebarCollapsed').on('click', sidebarToggle);
-    let collapseSidebar = parseCookie('collapseSidebar') === 'true';
-    if (($('#sidebar').hasClass('collapsed') & !collapseSidebar) | (!$('#sidebar').hasClass('collapsed') & collapseSidebar)) {
-        sidebarToggle();
-    }
+    // let collapseSidebar = parseCookie('collapseSidebar') === 'true';
+    // if (($('#sidebar').hasClass('collapsed') & !collapseSidebar) | (!$('#sidebar').hasClass('collapsed') & collapseSidebar)) {
+    //     sidebarToggle();
+    // }
 });

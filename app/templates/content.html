@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+
+{% set sidebar_links_html = sidebar_links_html %}
+{% set collapse_sidebar = collapse_sidebar %}
+{% set loading_text = loading_text %}
+
+{% block content %}
+<script type="text/javascript">
+    $(window).on('load', function () {
+        $('table.display#dataView').DataTable();
+    });
+</script>
+{{ content_html|safe }}
+{% endblock %}

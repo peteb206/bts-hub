@@ -1,7 +1,7 @@
 body {
     font-family: 'Open Sans';
     color: #165916;
-    background-color: #E8E8E8;
+    background-color: #e1e8ef;
 }
 a {
     text-decoration: none;
@@ -78,8 +78,8 @@ a, a:hover, a:focus {
 }
 #sidebar ul.components {
     padding: 20px 0;
-    border-top: 1px solid #D3D3D3;
-    border-bottom: 1px solid #D3D3D3;
+    border-top: 1px solid #e1e8ef;
+    border-bottom: 1px solid #e1e8ef;
 }
 #sidebar ul li a {
     padding: 10px;
@@ -88,16 +88,13 @@ a, a:hover, a:focus {
 }
 #sidebar ul li a:hover {
     color: #165916;
-    background: #D3D3D3;
+    background: #e1e8ef;
 }
 #sidebar ul li.active {
     color: #165916;
-    background: #D3D3D3;
+    background: #e1e8ef;
     border-left: 3px solid #165916;
     border-right: 3px solid #165916;
-}
-#spinnerDiv {
-    background-color: #D3D3D3;
 }
 #spinner {
     width: 5rem;

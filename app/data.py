@@ -8,7 +8,6 @@ from bs4 import BeautifulSoup
 from requests_html import HTMLSession
 from datetime import datetime, date as dt, timedelta
 import time
-from app.utils import html_table
 
 
 class BTSHubMongoDB:
@@ -386,6 +385,7 @@ class BTSHubMongoDB:
 
 
     def read_collection_to_html_table(self, collection, where_dict={}):
+        from app.utils import html_table
         return html_table('dataView', self.read_collection_as_list(collection, where_dict=where_dict))
     ####################################
     ##### End Get From Collection ######

@@ -64,8 +64,3 @@ let buildDataTable = function(args) {
         }
     });
 }
-
-$(window).on('load', function () {
-    $('#spinnerDiv').addClass('hidden');
-    $('#content').removeClass('hidden');
-});

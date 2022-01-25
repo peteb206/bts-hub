@@ -17,9 +17,19 @@ jobs:
             run: |
                python -m pip install --upgrade pip
                pip install -r requirements.txt
-         -  name: update database with python script
+         -  name: update database with this year's data
             env:
                DATABASE_CLIENT: ${{ secrets.DATABASE_CLIENT }}
+            run: |
+               cd app
+               python data.py daily
+         -  name: get past year to update in database
+            id: year
+            run: echo "::set-output name=year::year=$(($(date +%u)+2014))"
+         -  name: update database with past year's data
+            env:
+               DATABASE_CLIENT: ${{ secrets.DATABASE_CLIENT }}
+               YEAR: ${{ steps.year.outputs.year }}
             run: |
                cd app
                python data.py daily

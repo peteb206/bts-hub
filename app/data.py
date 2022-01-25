@@ -248,12 +248,12 @@ class BTSHubMongoDB:
     def get_teams_from_mlb(self):
         # Read json
         teams_dict = self.__get(f'{self.__stats_api_url}/teams?{self.__stats_api_default_params}&season={self.date.year}')
-        teams_df = pd.DataFrame(teams_dict['teams'])[['season', 'id', 'abbreviation', 'name']]
+        teams_df = pd.DataFrame(teams_dict['teams'])[['season', 'id', 'abbreviation', 'name', 'division.name']]
 
         # Clean up dataframe
-        teams_df.rename({'season': 'year', 'id': 'teamId', 'abbreviation': 'teamAbbreviation', 'name': 'teamName'}, axis=1, inplace=True)
-        teams_df.sort_values(by=['year', 'teamId'], ignore_index=True, inplace=True)
-        return teams_df[['year', 'teamId', 'teamAbbreviation', 'teamName']]
+        teams_df.rename({'season': 'year', 'id': 'teamId', 'abbreviation': 'teamAbbreviation', 'name': 'teamName', 'division.name': 'divisionName'}, axis=1, inplace=True)
+        teams_df.sort_values(by=['year', 'divisionName', 'teamId'], ignore_index=True, inplace=True)
+        return teams_df[['year', 'teamId', 'teamAbbreviation', 'teamName', 'divisionName']]
 
 
     def get_players_from_mlb(self):
@@ -417,7 +417,7 @@ class BTSHubMongoDB:
     ##### Add Column to Collection #####
     ####################################
     def add_column_to_collection(self, collection, column_name='', column_value=''):
-        return self.get_db()[collection].update_many({}, {'$set': {column_name: column_value}}, upsert=False, array_filters=None)
+        self.get_db()[collection].update_many({}, {'$set': {column_name: column_value}}, upsert=False, array_filters=None)
     ####################################
     ### End Add Column to Collection ###
     ####################################
@@ -427,7 +427,7 @@ class BTSHubMongoDB:
     ### Rename Column in Collection ####
     ####################################
     def rename_column_in_collection(self, collection, old_name='', new_name=''):
-        return self.get_db()[collection].update_many({}, {'$rename': {old_name: new_name}}, upsert=False, array_filters=None)
+        self.get_db()[collection].update_many({}, {'$rename': {old_name: new_name}}, upsert=False, array_filters=None)
     ####################################
     # End Rename Column in Collection ##
     ####################################
@@ -457,7 +457,9 @@ if __name__ == '__main__':
     pd.set_option('expand_frame_repr', False)
     if 'DATABASE_CLIENT' not in os.environ:
         os.environ['DATABASE_CLIENT'] = input('Database connection: ')
-    db = BTSHubMongoDB(os.environ.get('DATABASE_CLIENT'), 'bts-hub') # add date = dt(<year>, <month>, <day>) as necessary
+    date = dt(int(os.environ.get('YEAR')), 12, 31) if 'YEAR' in os.environ else None
+    db = BTSHubMongoDB(os.environ.get('DATABASE_CLIENT'), 'bts-hub', date=date)
+    print(f'Updating database for the year {db.date.year}')
 
     update_type, update_confirmed, collections = sys.argv[1] if len(sys.argv) > 1 else None, 'Y', ['games']
     while update_type not in ['daily', 'hourly', 'clear']:

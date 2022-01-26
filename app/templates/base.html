@@ -44,7 +44,7 @@
                {{ sidebar_links_html|safe }}
             </ul>
             <div class="container-fluid">
-               <img src="{{url_for('static', filename='img/rogers_centre.jpeg')}}" {% if collapse_sidebar %} class="hidden" {% endif %}>
+               <img src="{{url_for('static', filename='img/rogers_centre.jpeg')}}" id="sidebarImage" {% if collapse_sidebar %} class="hidden" {% endif %}>
                <button type="button" id="sidebarCollapse" class="btn btn-secondary {% if collapse_sidebar %} hidden {% endif %}">
                   <i class="fas fa-angle-double-left"></i>
                   <span class="buttonText">Collapse Sidebar</span>
@@ -54,7 +54,7 @@
                </button>
             </div>
          </nav>
-         <div class="container-fluid">
+         <div id="rightBody" class="container-fluid">
             <div id="spinnerDiv" class="row vertical-center">
                <div class="d-flex flex-column align-items-center">
                   <div class="row">

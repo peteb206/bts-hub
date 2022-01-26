@@ -10,11 +10,18 @@ th, td {
     white-space: nowrap;
     text-align: center;
 }
-img {
+#sidebarImage {
     position: absolute;
     left: 0px;
     padding: 0px;
     max-width: 200px;
+}
+.datePickerLabel {
+    padding-right: 5px;
+}
+.datePickerIcon {
+    color: #165916;
+    background-color: #e1e8ef;
 }
 .border_left {
     border-left: 2px solid;
@@ -42,10 +49,16 @@ img {
 #main-content {
     font-size: 13px;
 }
+#rightBody {
+    position: relative;
+    z-index: 1;
+}
 #sidebar {
+    position: fixed;
     min-width: 200px;
     max-width: 200px;
     min-height: 100vh;
+    z-index: 2;
     background: #165916;
     color: #E8E8E8;
     /* transition: all 0.3s; */
@@ -89,6 +102,8 @@ a, a:hover, a:focus {
 #sidebar ul li a:hover {
     color: #165916;
     background: #e1e8ef;
+    border-left: 3px solid #165916;
+    border-right: 3px solid #165916;
 }
 #sidebar ul li.active {
     color: #165916;

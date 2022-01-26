@@ -1,15 +1,4 @@
-$(document).ready(function () {
-    let addClass = function(element, className) {
-        if (!element.hasClass(className)) {
-            element.addClass(className);
-        }
-    }
-    let removeClass = function(element, className) {
-        if (element.hasClass(className)) {
-            element.removeClass(className);
-        }
-    }
-    let sidebarToggle = function () {
+$(document).ready(function () {let sidebarToggle = function () {
         let classMap = {
             'hidden': {
                 '#fullSidebarHeader': true,
@@ -24,6 +13,7 @@ $(document).ready(function () {
 
         $('#sidebar').toggleClass('collapsed');
         var collapseSidebar = $('#sidebar').hasClass('collapsed');
+        adjustContentToSidebar();
         $(document).attr('cookie', 'collapseSidebar=' + collapseSidebar);
 
         $.each(classMap, function (className, elements) {
@@ -46,10 +36,12 @@ $(document).ready(function () {
             });
         });
     };
+
     $('#sidebarCollapse').on('click', sidebarToggle);
     $('#sidebarCollapsed').on('click', sidebarToggle);
     // let collapseSidebar = parseCookie('collapseSidebar') === 'true';
     // if (($('#sidebar').hasClass('collapsed') & !collapseSidebar) | (!$('#sidebar').hasClass('collapsed') & collapseSidebar)) {
     //     sidebarToggle();
     // }
+    adjustContentToSidebar();
 });

@@ -64,3 +64,36 @@ let buildDataTable = function(args) {
         }
     });
 }
+
+let formatDatePickerDate = function(date, format) {
+    var dateString = '';
+    if (format == 'yyyy-mm-dd') {
+        year = date.getFullYear();
+        month = date.getMonth() + 1;
+        day = date.getDate();
+        if (month < 10) {
+            month = '0' + month;
+        }
+        if (day < 10) {
+            day = '0' + day;
+        }
+        dateString = [year, month, day].join('-');
+    }
+    return dateString;
+}
+
+let adjustContentToSidebar = function() {
+    $('#rightBody').css('margin-left', $('#sidebar').css('max-width'));
+}
+
+let addClass = function(element, className) {
+    if (!element.hasClass(className)) {
+        element.addClass(className);
+    }
+}
+
+let removeClass = function(element, className) {
+    if (element.hasClass(className)) {
+        element.removeClass(className);
+    }
+}

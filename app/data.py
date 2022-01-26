@@ -8,6 +8,7 @@ from bs4 import BeautifulSoup
 from requests_html import HTMLSession
 from datetime import datetime, date as dt, timedelta
 import time
+from pandas.api.types import is_datetime64_any_dtype as is_datetime
 
 
 class BTSHubMongoDB:
@@ -64,10 +65,15 @@ class BTSHubMongoDB:
                     for pk_tup in info['key']:
                         pks.append(pk_tup[0])
             columns, change = [col for col in existing_df.columns if col not in pks], False
+            existing_df = self.__add_year_column(existing_df)
             existing_df['_new'] = False
+            new_df = self.__add_year_column(new_df)
             new_df['_new'] = True
             combined_df = pd.concat([existing_df, new_df]).drop_duplicates(subset=pks + columns, keep=False, ignore_index=True)
-            new_records_df= combined_df.drop_duplicates(subset=pks, keep=False).query('_new')
+            no_pk_dups_df, query_string = combined_df.drop_duplicates(subset=pks, keep=False), '(not _new)'
+            if ('year' in existing_df.columns) & ('year' in combined_df.columns):
+                query_string += f' & (year == {self.date.year})'
+            new_records_df, old_records_df = no_pk_dups_df.query('_new'), no_pk_dups_df.query(query_string)
             if len(new_records_df.index) > 0:
                 new_records_df, change = new_records_df[pks + columns], True
                 print(self.__add_to_db(collection, new_records_df))
@@ -77,6 +83,10 @@ class BTSHubMongoDB:
                 updated_records_df, change = updated_records_df[pks + columns], True
                 print(self.__update_records(collection, pks, columns, updated_records_df))
                 print(updated_records_df)
+            if len(old_records_df.index) > 0:
+                old_records_df = old_records_df[pks + columns]
+                print(f'The following records were not found in the scrape for {collection}:')
+                print(old_records_df)
             if not change:
                 print(f'No records added to or updated in {collection}.')
 
@@ -165,6 +175,13 @@ class BTSHubMongoDB:
         injuries = json.loads(self.session.get(f'https://cdn.fangraphs.com/api/roster-resource/injury-report/data?loaddate={load_date}&season={self.date.year}', headers = self.fangraphs_header).text)
         out = [injury['mlbamid'] for injury in injuries if injury['returndate'] == None]
         return out
+
+
+    def __add_year_column(self, df):
+        datetime_cols = [column for column in df.columns if is_datetime(df[column])]
+        if len(datetime_cols) == 1:
+            df['year'] = df[datetime_cols[0]].apply(lambda x: x.year)
+        return df
     ####################################
     ########### End Helpers ############
     ####################################
@@ -248,10 +265,13 @@ class BTSHubMongoDB:
     def get_teams_from_mlb(self):
         # Read json
         teams_dict = self.__get(f'{self.__stats_api_url}/teams?{self.__stats_api_default_params}&season={self.date.year}')
-        teams_df = pd.DataFrame(teams_dict['teams'])[['season', 'id', 'abbreviation', 'name', 'division.name']]
+        teams_df = pd.DataFrame(teams_dict['teams'])[['season', 'id', 'abbreviation', 'name', 'division']]
+
+        # Calculated columns
+        teams_df['divisionName'] = teams_df['division'].apply(lambda x: x['name'])
 
         # Clean up dataframe
-        teams_df.rename({'season': 'year', 'id': 'teamId', 'abbreviation': 'teamAbbreviation', 'name': 'teamName', 'division.name': 'divisionName'}, axis=1, inplace=True)
+        teams_df.rename({'season': 'year', 'id': 'teamId', 'abbreviation': 'teamAbbreviation', 'name': 'teamName'}, axis=1, inplace=True)
         teams_df.sort_values(by=['year', 'divisionName', 'teamId'], ignore_index=True, inplace=True)
         return teams_df[['year', 'teamId', 'teamAbbreviation', 'teamName', 'divisionName']]
 
@@ -459,7 +479,6 @@ if __name__ == '__main__':
         os.environ['DATABASE_CLIENT'] = input('Database connection: ')
     date = dt(int(os.environ.get('YEAR')), 12, 31) if 'YEAR' in os.environ else None
     db = BTSHubMongoDB(os.environ.get('DATABASE_CLIENT'), 'bts-hub', date=date)
-    print(f'Updating database for the year {db.date.year}')
 
     update_type, update_confirmed, collections = sys.argv[1] if len(sys.argv) > 1 else None, 'Y', ['games']
     while update_type not in ['daily', 'hourly', 'clear']:
@@ -473,6 +492,7 @@ if __name__ == '__main__':
                 update_confirmed = input(f'Are you sure you want to clear out the following collections: {", ".join(collections)}? Y/N: ')
 
     if update_confirmed == 'Y':
+        print(f'Updating database for the year {db.date.year}')
         for collection in collections:
             if update_type == 'clear':
                 print(db.clear_collection(collection))

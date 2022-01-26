@@ -152,29 +152,44 @@ def sidebar_links_html(db, current_endpoint, collapse_sidebar):
     return list_items_html
 
 
-def filters_html(current_path, filter_type, filter_values):
-    filter_html = '<div class="col-3">'
-    if filter_type == 'date':
+def filters_html(filter_types, filter_values):
+    filter_html = ''
+    if 'date' in filter_types:
         date_value = filter_values.strftime('%a, %B %-d, %Y')
-        filter_html +=  '<span class="datePickerLabel">Date:</span>'
-        filter_html += f'<input placeholder="None selected..." type="text" id="date" class="datepicker" value="{date_value}">'
-    elif filter_type == 'range':
-        date_value = [filter_value.strftime('%a, %B %-d, %Y') if filter_value else '' for filter_value in filter_values]
-        filter_html +=  '<span class="datePickerLabel">Start Date:</span>'
-        filter_html += f'<input placeholder="None selected..." type="text" id="startDate" class="datepicker" value="{date_value[0]}">'
+        filter_html += '<div class="col-auto">'
+        filter_html +=    '<span class="datePickerLabel">Date:</span>'
+        filter_html +=   f'<input placeholder="None selected..." type="text" id="date" class="datepicker" value="{date_value}">'
         filter_html += '</div>'
-        filter_html +=  '<div class="col-3">'
-        filter_html +=  '<span class="datePickerLabel">End Date:</span>'
-        filter_html += f'<input placeholder="None selected..." type="text" id="endDate" class="datepicker" value="{date_value[1]}">'
-    elif filter_type == 'year':
-        filter_html += '<span class="datePickerLabel">Year:</span>'
-        filter_html += '<select id="endDatePicker" onchange="location=this.value;">'
+    elif 'date_range' in filter_types:
+        date_value = [filter_value.strftime('%a, %B %-d, %Y') if filter_value else '' for filter_value in filter_values]
+        filter_html += '<div class="col-auto">'
+        filter_html +=    '<span class="datePickerLabel">Start Date:</span>'
+        filter_html +=   f'<input placeholder="None selected..." type="text" id="startDate" class="datepicker" value="{date_value[0]}">'
+        filter_html += '</div>'
+        filter_html += '<div class="col-auto">'
+        filter_html +=    '<span class="datePickerLabel">End Date:</span>'
+        filter_html +=   f'<input placeholder="None selected..." type="text" id="endDate" class="datepicker" value="{date_value[1]}">'
+        filter_html += '</div>'
+    elif 'year' in filter_types:
+        filter_html += '<div class="col-auto">'
+        filter_html +=    '<span class="datePickerLabel">Year:</span>'
+        filter_html +=    '<select id="yearPicker" onchange="addClass($(\'#updateFiltersButtonInactive\'), \'hidden\'); removeClass($(\'#updateFiltersButtonActive\'), \'hidden\');">'
         for year in range(2015, 2023):
-            date_value = f'/{current_path}?year={year}'
-            selected_year = 'selected="selected"' if year == filter_values else ''
-            filter_html += f'<option value="{date_value}" {selected_year}>{year}</option>'
-        filter_html += '</select>'
-    filter_html += '</div>'
+            selected_year = ' selected="selected"' if year == filter_values else ''
+            filter_html +=    f'<option value="{year}"{selected_year}>{year}</option>'
+        filter_html +=    '</select>'
+        filter_html += '</div>'
+    if filter_html != '':
+        filter_html += '<div class="col-auto">'
+        filter_html +=    '<button type="button" id="updateFiltersButtonInactive" class="btn btn-secondary">'
+        filter_html +=       '<i class="fas fa-sync"></i>'
+        filter_html +=       '<span class="buttonText">Update</span>'
+        filter_html +=    '</button>'
+        filter_html +=    '<button type="button" id="updateFiltersButtonActive" class="btn btn-secondary hidden">'
+        filter_html +=       '<i class="fas fa-sync"></i>'
+        filter_html +=       '<span class="buttonText">Update</span>'
+        filter_html +=    '</button>'
+        filter_html += '</div>'
     return filter_html
 
 

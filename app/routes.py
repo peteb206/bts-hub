@@ -34,11 +34,13 @@ def render_page(path):
 def render_content(path):
     query_parameters_dict = parse_request_arguments(request.args)
     query_parameters = query_parameters_dict.keys()
-    filter_type, filter_values = None, None
+    filter_types, filter_values = list(), None
     if 'date' in query_parameters:
-        filter_type, filter_values = 'date', datetime.datetime.strptime(query_parameters_dict['date'], '%Y-%m-%d')
+        filter_types.append('date')
+        filter_values = datetime.datetime.strptime(query_parameters_dict['date'], '%Y-%m-%d')
     elif ('startDate' in query_parameters) | ('endDate' in query_parameters):
-        filter_type, filter_values = 'range', list()
+        filter_types.append('date_range')
+        filter_values = list()
         collection_columns = db.collection_columns(path)['columns']
         collection_column_names = list(collection_columns.keys())
         for date_boundary in ['startDate', 'endDate']:
@@ -55,7 +57,8 @@ def render_content(path):
             else:
                 filter_values.append('')
     elif 'year' in query_parameters:
-        filter_type, filter_values = 'year', query_parameters_dict['year']
+        filter_types.append('year')
+        filter_values = query_parameters_dict['year']
         collection_columns = db.collection_columns(path)['columns']
         collection_column_names = list(collection_columns.keys())
         if 'year' not in collection_column_names:
@@ -72,7 +75,7 @@ def render_content(path):
     return render_template(
         'content.html', # f'{path}.html'
         current_path=path,
-        filters_html=filters_html(path, filter_type, filter_values),
+        filters_html=filters_html(filter_types, filter_values),
         content_html=content_html
     )
 ####################################

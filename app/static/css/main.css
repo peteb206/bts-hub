@@ -10,11 +10,15 @@ th, td {
     white-space: nowrap;
     text-align: center;
 }
-img {
+#sidebarImage {
     position: absolute;
     left: 0px;
     padding: 0px;
     max-width: 200px;
+}
+.datePickerIcon {
+    color: #165916;
+    background-color: #e1e8ef;
 }
 .border_left {
     border-left: 2px solid;
@@ -89,6 +93,8 @@ a, a:hover, a:focus {
 #sidebar ul li a:hover {
     color: #165916;
     background: #e1e8ef;
+    border-left: 3px solid #165916;
+    border-right: 3px solid #165916;
 }
 #sidebar ul li.active {
     color: #165916;

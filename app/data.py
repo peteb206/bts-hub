@@ -381,6 +381,7 @@ class BTSHubMongoDB:
 
 
     def read_collection_as_list(self, collection, where_dict={}):
+        print(collection, where_dict)
         return list(self.get_db()[collection].find(where_dict, {'_id': False}))
 
 

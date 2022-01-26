@@ -248,10 +248,13 @@ class BTSHubMongoDB:
     def get_teams_from_mlb(self):
         # Read json
         teams_dict = self.__get(f'{self.__stats_api_url}/teams?{self.__stats_api_default_params}&season={self.date.year}')
-        teams_df = pd.DataFrame(teams_dict['teams'])[['season', 'id', 'abbreviation', 'name', 'division.name']]
+        teams_df = pd.DataFrame(teams_dict['teams'])[['season', 'id', 'abbreviation', 'name', 'division']]
+
+        # Calculated columns
+        teams_df['divisionName'] = teams_df['division'].apply(lambda x: x['name'])
 
         # Clean up dataframe
-        teams_df.rename({'season': 'year', 'id': 'teamId', 'abbreviation': 'teamAbbreviation', 'name': 'teamName', 'division.name': 'divisionName'}, axis=1, inplace=True)
+        teams_df.rename({'season': 'year', 'id': 'teamId', 'abbreviation': 'teamAbbreviation', 'name': 'teamName'}, axis=1, inplace=True)
         teams_df.sort_values(by=['year', 'divisionName', 'teamId'], ignore_index=True, inplace=True)
         return teams_df[['year', 'teamId', 'teamAbbreviation', 'teamName', 'divisionName']]
 
@@ -381,7 +384,6 @@ class BTSHubMongoDB:
 
 
     def read_collection_as_list(self, collection, where_dict={}):
-        print(collection, where_dict)
         return list(self.get_db()[collection].find(where_dict, {'_id': False}))
 
 

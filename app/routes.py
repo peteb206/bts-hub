@@ -37,7 +37,6 @@ def render_content(path):
     filter_type, filter_values = None, None
     if 'date' in query_parameters:
         filter_type, filter_values = 'date', datetime.datetime.strptime(query_parameters_dict['date'], '%Y-%m-%d')
-        print(query_parameters_dict['date'], filter_values)
     elif ('startDate' in query_parameters) | ('endDate' in query_parameters):
         filter_type, filter_values = 'range', list()
         collection_columns = db.collection_columns(path)['columns']

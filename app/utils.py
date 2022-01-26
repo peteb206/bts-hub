@@ -156,18 +156,18 @@ def filters_html(current_path, filter_type, filter_values):
     filter_html = '<div class="col-3">'
     if filter_type == 'date':
         date_value = filter_values.strftime('%a, %B %-d, %Y')
-        filter_html +=  '<span>Date:</span>'
+        filter_html +=  '<span class="datePickerLabel">Date:</span>'
         filter_html += f'<input placeholder="None selected..." type="text" id="date" class="datepicker" value="{date_value}">'
     elif filter_type == 'range':
         date_value = [filter_value.strftime('%a, %B %-d, %Y') if filter_value else '' for filter_value in filter_values]
-        filter_html +=  '<span>Start Date:</span>'
+        filter_html +=  '<span class="datePickerLabel">Start Date:</span>'
         filter_html += f'<input placeholder="None selected..." type="text" id="startDate" class="datepicker" value="{date_value[0]}">'
         filter_html += '</div>'
         filter_html +=  '<div class="col-3">'
-        filter_html +=  '<span>End Date:</span>'
+        filter_html +=  '<span class="datePickerLabel">End Date:</span>'
         filter_html += f'<input placeholder="None selected..." type="text" id="endDate" class="datepicker" value="{date_value[1]}">'
     elif filter_type == 'year':
-        filter_html += '<span>Year:</span>'
+        filter_html += '<span class="datePickerLabel">Year:</span>'
         filter_html += '<select id="endDatePicker" onchange="location=this.value;">'
         for year in range(2015, 2023):
             date_value = f'/{current_path}?year={year}'

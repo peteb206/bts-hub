@@ -16,6 +16,9 @@ th, td {
     padding: 0px;
     max-width: 200px;
 }
+.datePickerLabel {
+    padding-right: 5px;
+}
 .datePickerIcon {
     color: #165916;
     background-color: #e1e8ef;
@@ -46,10 +49,16 @@ th, td {
 #main-content {
     font-size: 13px;
 }
+#rightBody {
+    position: relative;
+    z-index: 1;
+}
 #sidebar {
+    position: fixed;
     min-width: 200px;
     max-width: 200px;
     min-height: 100vh;
+    z-index: 2;
     background: #165916;
     color: #E8E8E8;
     /* transition: all 0.3s; */

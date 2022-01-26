@@ -81,3 +81,19 @@ let formatDatePickerDate = function(date, format) {
     }
     return dateString;
 }
+
+let adjustContentToSidebar = function() {
+    $('#rightBody').css('margin-left', $('#sidebar').css('max-width'));
+}
+
+let addClass = function(element, className) {
+    if (!element.hasClass(className)) {
+        element.addClass(className);
+    }
+}
+
+let removeClass = function(element, className) {
+    if (element.hasClass(className)) {
+        element.removeClass(className);
+    }
+}

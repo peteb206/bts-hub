@@ -16,6 +16,18 @@ th, td {
     padding: 0px;
     max-width: 200px;
 }
+.filter {
+    position: fixed;
+    top: 10px;
+    min-height: 65px;
+    max-height: 65px;
+    min-width: 100%;
+    max-width: 100%;
+}
+.belowFilter {
+    position: relative;
+    top: 75px;
+}
 .datePickerLabel {
     padding-right: 5px;
 }
@@ -115,4 +127,14 @@ a, a:hover, a:focus {
     width: 5rem;
     height: 5rem;
     animation-duration: 1s;
+}
+#updateFiltersButtonInactive {
+    background: white;
+    color: #E8E8E8;
+    line-height: 1;
+}
+#updateFiltersButtonActive {
+    background: #165916;
+    color: #e1e8ef;
+    line-height: 1;
 }

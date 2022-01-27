@@ -2,7 +2,8 @@ import os
 from app import app, db
 from flask import jsonify, render_template, request, redirect, send_from_directory
 import datetime
-from app.utils import parse_request_arguments, sidebar_links_html, filters_html, get_available_dates
+import app.utils as utils
+import app.html_utils as html_utils
 
 ####################################
 ########### HTML Pages #############
@@ -19,21 +20,21 @@ def base():
 
 @app.route('/<path>', methods=['GET'])
 def render_page(path):
-    query_parameters_dict = parse_request_arguments(request.args)
+    query_parameters_dict = utils.parse_request_arguments(request.args)
     if (path == 'dashboard') & ('date' not in query_parameters_dict.keys()):
-        return redirect(f'/dashboard?date={get_available_dates(db, max_min="max")}')
+        return redirect(f'/dashboard?date={utils.get_available_dates(db, max_min="max")}')
     collapse_sidebar = request.cookies.get('collapseSidebar') == 'true'
     return render_template(
         'base.html',
         collapse_sidebar=collapse_sidebar,
         loading_text=f'Loading {path}...',
-        sidebar_links_html=sidebar_links_html(db, request.path, collapse_sidebar)
+        sidebar_links_html=html_utils.sidebar_links_html(db, request.path, collapse_sidebar)
     )
 
 
 @app.route('/<path>/content', methods=['GET'])
 def render_content(path):
-    query_parameters_dict = parse_request_arguments(request.args)
+    query_parameters_dict = utils.parse_request_arguments(request.args)
     query_parameters = query_parameters_dict.keys()
     filter_types, filter_values = list(), None
     if 'date' in query_parameters:
@@ -79,7 +80,7 @@ def render_content(path):
     return render_template(
         'content.html', # f'{path}.html'
         current_path=path,
-        filters_html=filters_html(filter_types, filter_values),
+        filters_html=html_utils.filters_html(filter_types, filter_values),
         content_html=content_html
     )
 ####################################
@@ -91,12 +92,12 @@ def render_content(path):
 ####################################
 @app.route('/data/availableDates')
 def available_dates():
-    return jsonify({'data': get_available_dates(db)})
+    return jsonify({'data': utils.get_available_dates(db)})
 
 
 @app.route('/data/<collection>')
 def data(collection):
-    collection_data = db.read_collection_as_list(collection, where_dict=parse_request_arguments(request.args)) if collection in db.get_db().list_collection_names() else list()
+    collection_data = db.read_collection_as_list(collection, where_dict=utils.parse_request_arguments(request.args)) if collection in db.get_db().list_collection_names() else list()
     return jsonify({'data': collection_data})
 
 

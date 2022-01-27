@@ -1,3 +1,7 @@
+try:
+    import app.html_utils as html_utils
+except ModuleNotFoundError:
+    import html_utils
 import os
 import sys
 import pymongo
@@ -299,14 +303,15 @@ class BTSHubMongoDB:
 
     def get_games_from_mlb(self):
         # Read json
-        games_dict = self.__get(f'{self.__stats_api_url}/schedule?{self.__stats_api_default_params}&gameType=R&season={self.date.year}&hydrate=probablePitcher,lineups')
+        games_dict = self.__get(f'{self.__stats_api_url}/schedule?{self.__stats_api_default_params}&gameType=R&season={self.date.year}&hydrate=probablePitcher,lineups,weather')
 
         # Calculated columns
         games_list = list()
         for date in games_dict['dates']:
             games_list += date['games']
-        games_df = pd.DataFrame(games_list)[['gameDate', 'officialDate', 'gamePk', 'status', 'teams', 'lineups', 'venue', 'dayNight']]
-        games_df['lineups'] = games_df['lineups'].apply(lambda x: x if isinstance(x, dict) else dict())
+        games_df = pd.DataFrame(games_list)[['gameDate', 'officialDate', 'gamePk', 'status', 'teams', 'lineups', 'venue', 'dayNight', 'weather']]
+        for col in ['lineups', 'weather']:
+            games_df[col] = games_df[col].apply(lambda x: x if isinstance(x, dict) else dict())
         for side in ['away', 'home']:
             games_df[f'{side}TeamId'] = games_df['teams'].apply(lambda x: x[side]['team']['id'])
             games_df[f'{side}StarterId'] = games_df['teams'].apply(lambda x: x[side]['probablePitcher']['id'] if 'probablePitcher' in x[side].keys() else 0)
@@ -318,10 +323,12 @@ class BTSHubMongoDB:
         games_df['status'] = games_df['status'].apply(lambda x: x['statusCode'])
         games_df = pd.merge(games_df, self.get_statcast_games(), how='left', on=['gamePk', 'gameDate'])
         games_df['statcastFlag'].fillna(False, inplace=True)
+        games_df['temperature'] = games_df['weather'].apply(lambda x: x['temp'] if 'temp' in x.keys() else '')
+        games_df['weather'] = games_df['weather'].apply(lambda x: x['condition'] if 'condition' in x.keys() else '')
 
         # Clean up dataframe
         games_df.sort_values(by=['gamePk', 'gameDateTimeUTC'], ignore_index=True, inplace=True)
-        return games_df[['gamePk', 'gameDateTimeUTC', 'status', 'awayTeamId', 'homeTeamId', 'awayStarterId', 'homeStarterId', 'awayLineup', 'homeLineup', 'stadiumId', 'dayGameFlag', 'statcastFlag']]
+        return games_df[['gamePk', 'gameDateTimeUTC', 'status', 'awayTeamId', 'homeTeamId', 'awayStarterId', 'homeStarterId', 'awayLineup', 'homeLineup', 'stadiumId', 'dayGameFlag', 'weather', 'temperature', 'statcastFlag']]
 
 
     def get_atBats_from_mlb(self):
@@ -346,12 +353,14 @@ class BTSHubMongoDB:
         df['eventTypeId'] = df['events'].apply(lambda x: self.output_events[x])
         df['rightHandedBatterFlag'] = df['stand'] == 'R'
         df['rightHandedPitcherFlag'] = df['p_throws'] == 'R'
+        games_df = self.read_collection('games', where_dict={'gameDateTimeUTC': {'$gte': datetime(self.date.year, 1, 1), '$lte': datetime(self.date.year, 12, 31)}})[['gamePk', 'gameDateTimeUTC']]
+        games_df['gameDate'] = games_df['gameDateTimeUTC'].apply(lambda x: (x - timedelta(hours=5)).replace(hour=0, minute=0, second=0)) # This should help align with statcast dates
+        df = pd.merge(df, games_df.rename({'gamePk': 'game_pk'}, axis=1), how='left', on=['game_pk', 'gameDate']) # Get actual datetime of game, not just date
 
         # Clean up dataframe
         df.rename({'game_pk': 'gamePk', 'at_bat_number': 'atBatNumber', 'batter': 'batterId', 'pitcher': 'pitcherId', 'estimated_ba_using_speedangle': 'xBA'}, inplace=True, axis=1)
-        df.drop(['inning_topbot', 'game_date', 'stand', 'p_throws', 'events'], axis=1, inplace=True)
-        df.sort_values(['gameDate', 'gamePk', 'inning', 'atBatNumber'], ignore_index=True, inplace=True)
-        return df[['gamePk', 'gameDate', 'atBatNumber', 'inning', 'inningBottomFlag', 'batterId', 'rightHandedBatterFlag', 'pitcherId', 'rightHandedPitcherFlag', 'xBA', 'eventTypeId']]
+        df.sort_values(['gamePk', 'gameDateTimeUTC', 'inning', 'atBatNumber'], ignore_index=True, inplace=True)
+        return df[['gamePk', 'gameDateTimeUTC', 'atBatNumber', 'inning', 'inningBottomFlag', 'batterId', 'rightHandedBatterFlag', 'pitcherId', 'rightHandedPitcherFlag', 'xBA', 'eventTypeId']]
 
 
     def __read_statcast_csv(self, month=4):
@@ -405,8 +414,7 @@ class BTSHubMongoDB:
 
 
     def read_collection_to_html_table(self, collection, where_dict={}):
-        from app.utils import html_table
-        return html_table('dataView', self.read_collection_as_list(collection, where_dict=where_dict))
+        return html_utils.html_table('dataView', self.read_collection_as_list(collection, where_dict=where_dict))
     ####################################
     ##### End Get From Collection ######
     ####################################

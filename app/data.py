@@ -299,14 +299,15 @@ class BTSHubMongoDB:
 
     def get_games_from_mlb(self):
         # Read json
-        games_dict = self.__get(f'{self.__stats_api_url}/schedule?{self.__stats_api_default_params}&gameType=R&season={self.date.year}&hydrate=probablePitcher,lineups')
+        games_dict = self.__get(f'{self.__stats_api_url}/schedule?{self.__stats_api_default_params}&gameType=R&season={self.date.year}&hydrate=probablePitcher,lineups,weather')
 
         # Calculated columns
         games_list = list()
         for date in games_dict['dates']:
             games_list += date['games']
-        games_df = pd.DataFrame(games_list)[['gameDate', 'officialDate', 'gamePk', 'status', 'teams', 'lineups', 'venue', 'dayNight']]
-        games_df['lineups'] = games_df['lineups'].apply(lambda x: x if isinstance(x, dict) else dict())
+        games_df = pd.DataFrame(games_list)[['gameDate', 'officialDate', 'gamePk', 'status', 'teams', 'lineups', 'venue', 'dayNight', 'weather']]
+        for col in ['lineups', 'weather']:
+            games_df[col] = games_df[col].apply(lambda x: x if isinstance(x, dict) else dict())
         for side in ['away', 'home']:
             games_df[f'{side}TeamId'] = games_df['teams'].apply(lambda x: x[side]['team']['id'])
             games_df[f'{side}StarterId'] = games_df['teams'].apply(lambda x: x[side]['probablePitcher']['id'] if 'probablePitcher' in x[side].keys() else 0)
@@ -318,10 +319,12 @@ class BTSHubMongoDB:
         games_df['status'] = games_df['status'].apply(lambda x: x['statusCode'])
         games_df = pd.merge(games_df, self.get_statcast_games(), how='left', on=['gamePk', 'gameDate'])
         games_df['statcastFlag'].fillna(False, inplace=True)
+        games_df['temperature'] = games_df['weather'].apply(lambda x: x['temp'] if 'temp' in x.keys() else '')
+        games_df['weather'] = games_df['weather'].apply(lambda x: x['condition'] if 'condition' in x.keys() else '')
 
         # Clean up dataframe
         games_df.sort_values(by=['gamePk', 'gameDateTimeUTC'], ignore_index=True, inplace=True)
-        return games_df[['gamePk', 'gameDateTimeUTC', 'status', 'awayTeamId', 'homeTeamId', 'awayStarterId', 'homeStarterId', 'awayLineup', 'homeLineup', 'stadiumId', 'dayGameFlag', 'statcastFlag']]
+        return games_df[['gamePk', 'gameDateTimeUTC', 'status', 'awayTeamId', 'homeTeamId', 'awayStarterId', 'homeStarterId', 'awayLineup', 'homeLineup', 'stadiumId', 'dayGameFlag', 'weather', 'temperature', 'statcastFlag']]
 
 
     def get_atBats_from_mlb(self):

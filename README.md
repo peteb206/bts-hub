@@ -1,8 +1,10 @@
-# bts_hub
+# bts-hub
 
 [![bts-hub-daily-scrape](https://github.com/peteb206/bts-hub/actions/workflows/bts-hub-daily-scrape.yml/badge.svg)](https://github.com/peteb206/bts-hub/actions/workflows/bts-hub-daily-scrape.yml)
+
 ## Open in Heroku
 https://bts-hub.herokuapp.com
+
 ## Open Locally
 ```
 cd <bts-hub directory>

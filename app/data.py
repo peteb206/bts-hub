@@ -1,3 +1,7 @@
+try:
+    import app.html_utils as html_utils
+except ModuleNotFoundError:
+    import html_utils
 import os
 import sys
 import pymongo
@@ -349,12 +353,14 @@ class BTSHubMongoDB:
         df['eventTypeId'] = df['events'].apply(lambda x: self.output_events[x])
         df['rightHandedBatterFlag'] = df['stand'] == 'R'
         df['rightHandedPitcherFlag'] = df['p_throws'] == 'R'
+        games_df = self.read_collection('games', where_dict={'gameDateTimeUTC': {'$gte': datetime(self.date.year, 1, 1), '$lte': datetime(self.date.year, 12, 31)}})[['gamePk', 'gameDateTimeUTC']]
+        games_df['gameDate'] = games_df['gameDateTimeUTC'].apply(lambda x: (x - timedelta(hours=5)).replace(hour=0, minute=0, second=0)) # This should help align with statcast dates
+        df = pd.merge(df, games_df.rename({'gamePk': 'game_pk'}, axis=1), how='left', on=['game_pk', 'gameDate']) # Get actual datetime of game, not just date
 
         # Clean up dataframe
         df.rename({'game_pk': 'gamePk', 'at_bat_number': 'atBatNumber', 'batter': 'batterId', 'pitcher': 'pitcherId', 'estimated_ba_using_speedangle': 'xBA'}, inplace=True, axis=1)
-        df.drop(['inning_topbot', 'game_date', 'stand', 'p_throws', 'events'], axis=1, inplace=True)
-        df.sort_values(['gameDate', 'gamePk', 'inning', 'atBatNumber'], ignore_index=True, inplace=True)
-        return df[['gamePk', 'gameDate', 'atBatNumber', 'inning', 'inningBottomFlag', 'batterId', 'rightHandedBatterFlag', 'pitcherId', 'rightHandedPitcherFlag', 'xBA', 'eventTypeId']]
+        df.sort_values(['gamePk', 'gameDateTimeUTC', 'inning', 'atBatNumber'], ignore_index=True, inplace=True)
+        return df[['gamePk', 'gameDateTimeUTC', 'atBatNumber', 'inning', 'inningBottomFlag', 'batterId', 'rightHandedBatterFlag', 'pitcherId', 'rightHandedPitcherFlag', 'xBA', 'eventTypeId']]
 
 
     def __read_statcast_csv(self, month=4):
@@ -408,8 +414,7 @@ class BTSHubMongoDB:
 
 
     def read_collection_to_html_table(self, collection, where_dict={}):
-        from app.utils import html_table
-        return html_table('dataView', self.read_collection_as_list(collection, where_dict=where_dict))
+        return html_utils.html_table('dataView', self.read_collection_as_list(collection, where_dict=where_dict))
     ####################################
     ##### End Get From Collection ######
     ####################################

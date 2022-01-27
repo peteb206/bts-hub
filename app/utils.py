@@ -113,19 +113,54 @@ def parse_request_arguments(args):
     return args_dict
 
 
+def get_available_dates(db, max_min=None):
+    pipeline = [
+        {
+            '$match': {
+                'gameDateTimeUTC': {
+                    '$lte': datetime.datetime.combine(db.date + datetime.timedelta(days=1), datetime.datetime.max.time())
+                }
+            }
+        }, {
+            '$project': {
+                key: {f'${key}': '$gameDateTimeUTC'} for key in ['year', 'month', 'dayOfMonth']
+            }
+        }, {
+            '$group': {
+                '_id': {
+                    'year': '$year',
+                    'month': '$month',
+                    'day': '$dayOfMonth'
+                }
+            }
+        }, {
+            '$sort': {
+                '_id': -1 if max_min == 'max' else 1
+            }
+        }
+    ]
+    return_one = False
+    if max_min in ['min', 'max']:
+        pipeline.append({
+            '$limit': 1
+        })
+        return_one = True
+    result = [f'{date["_id"]["year"]}-{str(date["_id"]["month"]).zfill(2)}-{str(date["_id"]["day"]).zfill(2)}' for date in db.get_db()['games'].aggregate(pipeline)]
+    return result[0] if return_one else result
+
+
 def sidebar_links_html(db, current_endpoint, collapse_sidebar):
     # Font awesome icons: https://fontawesome.com/v5.0/icons?d=gallery&p=2&m=free
-    year = db.date.year
-    end_date = datetime.datetime.now()
-    start_date = end_date - datetime.timedelta(days=14)
-    start_date, end_date = start_date.strftime('%Y-%m-%d'), end_date.strftime('%Y-%m-%d')
+    available_dates = get_available_dates(db)
+    year = available_dates[-1].split('-')[0]
+    game_dates = [game_date for game_date in available_dates if game_date.startswith(year)]
     list_items = [
         ['Dashboard', 'fa-home', '/dashboard'],
         ['My Picks', 'fa-pencil-alt', '/picks'],
         ['Leaderboard', 'fa-list-ol', '/leaderboard'],
         ['Simulation', 'fa-chart-bar', '/simulations'],
-        ['Games', 'fa-calendar-alt', f'/games?year={year}'],
-        ['At Bats', 'fa-baseball-ball', f'/atBats?startDate={start_date}&endDate={end_date}'],
+        ['Games', 'fa-calendar-alt', f'/games?startDate={game_dates[0]}&endDate={game_dates[-1]}'],
+        ['At Bats', 'fa-baseball-ball', f'/atBats?startDate={available_dates[-10]}&endDate={available_dates[-1]}'],
         ['Players', 'fa-users', f'/players?year={year}'],
         ['Teams', 'fa-trophy', f'/teams?year={year}'],
         ['Stadiums', 'fa-university', '/stadiums'],
@@ -158,17 +193,17 @@ def filters_html(filter_types, filter_values):
         date_value = filter_values.strftime('%a, %B %-d, %Y')
         filter_html += '<div class="col-auto">'
         filter_html +=    '<span class="datePickerLabel">Date:</span>'
-        filter_html +=   f'<input placeholder="None selected..." type="text" id="date" class="datepicker" value="{date_value}">'
+        filter_html +=   f'<input placeholder="None selected..." type="text" id="date" class="datepicker" value="{date_value}" readonly>'
         filter_html += '</div>'
     elif 'date_range' in filter_types:
         date_value = [filter_value.strftime('%a, %B %-d, %Y') if filter_value else '' for filter_value in filter_values]
         filter_html += '<div class="col-auto">'
         filter_html +=    '<span class="datePickerLabel">Start Date:</span>'
-        filter_html +=   f'<input placeholder="None selected..." type="text" id="startDate" class="datepicker" value="{date_value[0]}">'
+        filter_html +=   f'<input placeholder="None selected..." type="text" id="startDate" class="datepicker" value="{date_value[0]}" readonly>'
         filter_html += '</div>'
         filter_html += '<div class="col-auto">'
         filter_html +=    '<span class="datePickerLabel">End Date:</span>'
-        filter_html +=   f'<input placeholder="None selected..." type="text" id="endDate" class="datepicker" value="{date_value[1]}">'
+        filter_html +=   f'<input placeholder="None selected..." type="text" id="endDate" class="datepicker" value="{date_value[1]}" readonly>'
         filter_html += '</div>'
     elif 'year' in filter_types:
         filter_html += '<div class="col-auto">'

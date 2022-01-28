@@ -23,7 +23,7 @@ def sidebar_links_html(db, current_endpoint, collapse_sidebar):
         ['Players', 'fas fa-users', f'/players?year={year}'],
         ['Teams', 'fas fa-trophy', f'/teams?year={year}'],
         ['Stadiums', 'fas fa-university', f'/stadiums?year={year}'],
-        # ['Links', 'fas fa-link', '/links']
+        # ['About', 'fas fa-question-circle', '/links']
     ]
     list_items_html, full_sidebar_hidden, partial_sidebar_hidden  = '', '', ''
     if collapse_sidebar:
@@ -117,9 +117,15 @@ def format_table_value(value):
 
 def display_html(db, path, filters={}):
     html = ''
-    if path == 'games':
-        display_columns = ['date', 'time', 'matchup', 'awayStarter', 'homeStarter', 'awayLineup', 'homeLineup', 'stadium', 'statcastTracked?']
+    if path in ['games', 'atBats']:
         df = db.read_collection(path, where_dict=filters)
+        display_columns = list()
+        if path == 'games':
+            display_columns = ['date', 'time', 'matchup', 'awayStarter', 'homeStarter', 'awayLineup', 'homeLineup', 'stadium', 'statcastTracked?']
+        else:
+            display_columns = ['batter', 'pitcher', 'matchup', 'lineupSlot', 'inning', 'xBA', 'outcome']
+            df = pd.merge(df, db.read_collection('games', where_dict=filters), how='left', on=['gamePk', 'gameDateTimeUTC'])
+            df['lineupSlot'] = ''
         df['year'] = df['gameDateTimeUTC'].apply(lambda x: x.year)
         df['date'] = df['gameDateTimeUTC'].apply(lambda x: utils.utc_to_central(x, return_type='date'))
         df['time'] = df['gameDateTimeUTC'].apply(lambda x: utils.utc_to_central(x, return_type='time'))
@@ -130,12 +136,21 @@ def display_html(db, path, filters={}):
         player_id_dict = dict(zip(players_df['playerId'], players_df['playerName']))
         player_id_dict_keys = list(player_id_dict.keys())
         for side in ['away', 'home']:
+            if path == 'games':
+                df[f'{side}Starter'] = df[f'{side}StarterId'].apply(lambda x: player_id_dict[x] if x in player_id_dict_keys else '')
+                df[f'{side}Lineup'] = df[f'{side}Lineup'].apply(lambda x: ' | '.join([f'{(k + 1)}. {v}' for k, v in enumerate([player_id_dict[player_id] if player_id in player_id_dict_keys else '' for player_id in list(x)])]))
+            else:
+                df['lineupSlot'] = df.apply(lambda row: str(row[f'{side}Lineup'].index(row['batterId']) + 1) if (row['lineupSlot'] == '') & (row['batterId'] in row[f'{side}Lineup']) else row['lineupSlot'], axis=1)
             df = pd.merge(df, teams_df, how='left', left_on=['year', f'{side}TeamId'], right_on=['year', 'teamId']).rename({'teamAbbreviation': f'{side}Team'}, axis=1)
-            df[f'{side}Starter'] = df[f'{side}StarterId'].apply(lambda x: player_id_dict[x] if x in player_id_dict_keys else '')
-            df[f'{side}Lineup'] = df[f'{side}Lineup'].apply(lambda x: ' | '.join([f'{(k + 1)}. {v}' for k, v in enumerate([player_id_dict[player_id] if player_id in player_id_dict_keys else '' for player_id in list(x)])]))
-        df['matchup'] = df.apply(lambda row: f'{row["awayTeam"]} @ {row["homeTeam"]}', axis=1)
-        df['stadium'] = ''
-        df.rename({'statcastFlag': 'statcastTracked?'}, axis=1, inplace=True)
+        if path == 'atBats':
+            df['batter'] = df.apply(lambda row: f'{player_id_dict[row["batterId"]]} ({"R" if row["rightHandedBatterFlag"] else "L"})' if row['batterId'] in player_id_dict_keys else '', axis=1)
+            df['pitcher'] = df.apply(lambda row: f'{player_id_dict[row["pitcherId"]]} ({"R" if row["rightHandedPitcherFlag"] else "L"})' if row['pitcherId'] in player_id_dict_keys else '', axis=1)
+            df['inning'] = df.apply(lambda row: f'{row["inning"]} ({"Bottom" if row["inningBottomFlag"] else "Top"})', axis=1)
+            df = pd.merge(df, db.read_collection('eventTypes').rename({'outputEventType': 'outcome'}, axis=1), how='left', on='eventTypeId')
+        else:
+            df = pd.merge(df, db.read_collection('stadiums')[['stadiumId', 'stadiumName']], how='left', on='stadiumId')
+        df['matchup'] = df.apply(lambda row: '{} @ {}{}'.format(row['awayTeam'], row['homeTeam'], f' ({row["awayScore"]} - {row["awayScore"]})' if row['awayScore'] + row['homeScore'] >= 0 else ''), axis=1)
+        df.rename({'statcastFlag': 'statcastTracked?', 'stadiumName': 'stadium'}, axis=1, inplace=True)
         html = html_table('dataView', df[display_columns])
     elif path == 'stadiums':
         park_factor_filter, display_columns = dict(), ['stadiumName', 'time', 'batterHand', 'parkFactor']

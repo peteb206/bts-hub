@@ -309,18 +309,18 @@ class BTSHubMongoDB:
         games_list = list()
         for date in games_dict['dates']:
             games_list += date['games']
-        games_df = pd.DataFrame(games_list)[['gameDate', 'officialDate', 'gamePk', 'status', 'teams', 'lineups', 'venue', 'dayNight', 'weather']]
+        games_df = pd.DataFrame(games_list)[['gameDate', 'officialDate', 'gamePk', 'teams', 'lineups', 'venue', 'dayNight', 'weather']]
         for col in ['lineups', 'weather']:
             games_df[col] = games_df[col].apply(lambda x: x if isinstance(x, dict) else dict())
         for side in ['away', 'home']:
             games_df[f'{side}TeamId'] = games_df['teams'].apply(lambda x: x[side]['team']['id'])
+            games_df[f'{side}Score'] = games_df['teams'].apply(lambda x: x[side]['score'] if 'score' in x[side].keys() else -1)
             games_df[f'{side}StarterId'] = games_df['teams'].apply(lambda x: x[side]['probablePitcher']['id'] if 'probablePitcher' in x[side].keys() else 0)
             games_df[f'{side}Lineup'] = games_df['lineups'].apply(lambda x: tuple(player['id'] for player in x[f'{side}Players']) if f'{side}Players' in x.keys() else tuple())
         games_df['gameDateTimeUTC'] = games_df['gameDate'].apply(lambda x: datetime.strptime(x, '%Y-%m-%dT%H:%M:%SZ'))
         games_df['gameDate'] = games_df['gameDateTimeUTC'].apply(lambda x: (x - timedelta(hours=5)).replace(hour=0, minute=0, second=0)) # This should help align with statcast dates
         games_df['dayGameFlag'] = games_df['dayNight'] == 'day'
         games_df['stadiumId'] = games_df['venue'].apply(lambda x: x['id'])
-        games_df['status'] = games_df['status'].apply(lambda x: x['statusCode'])
         games_df = pd.merge(games_df, self.get_statcast_games(), how='left', on=['gamePk', 'gameDate'])
         games_df['statcastFlag'].fillna(False, inplace=True)
         games_df['temperature'] = games_df['weather'].apply(lambda x: x['temp'] if 'temp' in x.keys() else '')
@@ -328,7 +328,7 @@ class BTSHubMongoDB:
 
         # Clean up dataframe
         games_df.sort_values(by=['gamePk', 'gameDateTimeUTC'], ignore_index=True, inplace=True)
-        return games_df[['gamePk', 'gameDateTimeUTC', 'status', 'awayTeamId', 'homeTeamId', 'awayStarterId', 'homeStarterId', 'awayLineup', 'homeLineup', 'stadiumId', 'dayGameFlag', 'weather', 'temperature', 'statcastFlag']]
+        return games_df[['gamePk', 'gameDateTimeUTC', 'awayTeamId', 'homeTeamId', 'awayScore', 'homeScore', 'awayStarterId', 'homeStarterId', 'awayLineup', 'homeLineup', 'stadiumId', 'dayGameFlag', 'weather', 'temperature', 'statcastFlag']]
 
 
     def get_atBats_from_mlb(self):
@@ -445,6 +445,7 @@ class BTSHubMongoDB:
     ##### Add Column to Collection #####
     ####################################
     def add_column_to_collection(self, collection, column_name='', column_value=''):
+        assert column_name, 'column_name argument must not be blank.'
         self.get_db()[collection].update_many({}, {'$set': {column_name: column_value}}, upsert=False, array_filters=None)
     ####################################
     ### End Add Column to Collection ###
@@ -455,9 +456,22 @@ class BTSHubMongoDB:
     ### Rename Column in Collection ####
     ####################################
     def rename_column_in_collection(self, collection, old_name='', new_name=''):
+        assert old_name in self.collection_columns(collection)['columns'], f'"{old_name}" is not a column in the "{collection}" collection.'
+        assert new_name, 'new_name argument must not be blank.'
         self.get_db()[collection].update_many({}, {'$rename': {old_name: new_name}}, upsert=False, array_filters=None)
     ####################################
     # End Rename Column in Collection ##
+    ####################################
+
+
+    ####################################
+    ### Drop Column from Collection ####
+    ####################################
+    def drop_column_from_collection(self, collection, column_name=''):
+        assert column_name in self.collection_columns(collection)['columns'], f'"{column_name}" is not a column in the "{collection}" collection.'
+        self.get_db()[collection].update_many({}, {'$unset': {column_name: ''}})
+    ####################################
+    # End Drop Column from Collection ##
     ####################################
 
 

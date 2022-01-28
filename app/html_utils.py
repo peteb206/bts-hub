@@ -6,8 +6,6 @@ from numpy import where
 import pandas as pd
 import re
 
-from app.utils import utc_to_central
-
 
 def sidebar_links_html(db, current_endpoint, collapse_sidebar):
     available_dates = utils.get_available_dates(db)

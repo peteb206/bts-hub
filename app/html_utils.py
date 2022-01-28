@@ -2,8 +2,11 @@ try:
     import app.utils as utils
 except ModuleNotFoundError:
     import utils
+from numpy import where
 import pandas as pd
 import re
+
+from app.utils import utc_to_central
 
 
 def sidebar_links_html(db, current_endpoint, collapse_sidebar):
@@ -21,7 +24,7 @@ def sidebar_links_html(db, current_endpoint, collapse_sidebar):
         ['At Bats', 'fas fa-baseball-ball', f'/atBats?startDate={available_dates[-10]}&endDate={available_dates[-1]}'],
         ['Players', 'fas fa-users', f'/players?year={year}'],
         ['Teams', 'fas fa-trophy', f'/teams?year={year}'],
-        ['Stadiums', 'fas fa-university', '/stadiums'],
+        ['Stadiums', 'fas fa-university', f'/stadiums?year={year}'],
         # ['Links', 'fas fa-link', '/links']
     ]
     list_items_html, full_sidebar_hidden, partial_sidebar_hidden  = '', '', ''
@@ -96,13 +99,58 @@ def html_table(table_id, data):
             tbody += '<tr>' + ''.join([f'<td>{format_table_value(document[column])}</td>' for column in column_list]) + '</tr>'
         if len(column_list) == 0:
             column_list = [' ']
-        thead = ''.join(['<th>{}</th>'.format(re.sub(r'((?<=[a-z])[A-Z]|(?<!\A)[A-Z](?=[a-z]))', r' \1', column[0].upper() + column[1:])) for column in column_list])
+        thead = ''.join([f'<th>{column}</th>' for column in convert_camel_case_columns(column_list)])
         return f'<table id="{table_id}" class="display"><thead>{thead}</thead><tbody>{tbody}</tbody></table>'
     else:
-        return data.to_html(na_rep='', table_id=table_id, classes='display', border=None, justify='unset', index=False)
+        data.columns = convert_camel_case_columns(data.columns)
+        df = data.to_html(na_rep='', table_id=table_id, classes='display', border=0, justify='unset', index=False)
+        return df
+
+
+def convert_camel_case_columns(column_list):
+    return [re.sub(r'((?<=[a-z])[A-Z]|(?<!\A)[A-Z](?=[a-z]))', r' \1', column[0].upper() + column[1:]) for column in column_list]
 
 
 def format_table_value(value):
     if value != value:
         value = ''
     return value
+
+
+def display_html(db, path, filters={}):
+    html = ''
+    if path == 'games':
+        display_columns = ['date', 'time', 'matchup', 'awayStarter', 'homeStarter', 'awayLineup', 'homeLineup', 'stadium', 'statcastTracked?']
+        df = db.read_collection(path, where_dict=filters)
+        df['year'] = df['gameDateTimeUTC'].apply(lambda x: x.year)
+        df['date'] = df['gameDateTimeUTC'].apply(lambda x: utils.utc_to_central(x, return_type='date'))
+        df['time'] = df['gameDateTimeUTC'].apply(lambda x: utils.utc_to_central(x, return_type='time'))
+        year_list = [int(year) for year in df['year'].unique()]
+        year_filter = {'year': {'$in': year_list}}
+        teams_df = db.read_collection('teams', where_dict=year_filter)[['year', 'teamId', 'teamAbbreviation']]
+        players_df = db.read_collection('players', where_dict=year_filter).drop_duplicates(subset='playerId')
+        player_id_dict = dict(zip(players_df['playerId'], players_df['playerName']))
+        player_id_dict_keys = list(player_id_dict.keys())
+        for side in ['away', 'home']:
+            df = pd.merge(df, teams_df, how='left', left_on=['year', f'{side}TeamId'], right_on=['year', 'teamId']).rename({'teamAbbreviation': f'{side}Team'}, axis=1)
+            df[f'{side}Starter'] = df[f'{side}StarterId'].apply(lambda x: player_id_dict[x] if x in player_id_dict_keys else '')
+            df[f'{side}Lineup'] = df[f'{side}Lineup'].apply(lambda x: ' | '.join([f'{(k + 1)}. {v}' for k, v in enumerate([player_id_dict[player_id] if player_id in player_id_dict_keys else '' for player_id in list(x)])]))
+        df['matchup'] = df.apply(lambda row: f'{row["awayTeam"]} @ {row["homeTeam"]}', axis=1)
+        df['stadium'] = ''
+        df.rename({'statcastFlag': 'statcastTracked?'}, axis=1, inplace=True)
+        html = html_table('dataView', df[display_columns])
+    elif path == 'stadiums':
+        park_factor_filter, display_columns = dict(), ['stadiumName', 'time', 'batterHand', 'parkFactor']
+        if 'year' in filters.keys():
+            park_factor_filter['year'] = filters['year']
+        else:
+            display_columns = ['year'] + display_columns
+        park_factors_df = db.read_collection('parkFactors', where_dict=park_factor_filter)
+        park_factors_df['time'] = park_factors_df['dayGameFlag'].apply(lambda x: 'Day' if x else 'Night')
+        park_factors_df['batterHand'] = park_factors_df['rightHandedFlag'].apply(lambda x: 'Right' if x else 'Left')
+        df = pd.merge(db.read_collection(path), park_factors_df, how='right', on='stadiumId')
+        df.sort_values(by='parkFactor', ascending=False, inplace=True)
+        html = html_table('dataView', df[display_columns])
+    else:
+        html = db.read_collection_to_html_table(path, where_dict=filters)
+    return html

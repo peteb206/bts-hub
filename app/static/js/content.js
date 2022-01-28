@@ -8,7 +8,9 @@ $(window).on('load', function () {
         success: function(contentHTML) {
             $('#content').append(contentHTML);
             $('table.display').each(function() {
-                $(this).DataTable();
+                $(this).DataTable({
+                    order: []
+                });
             });
             let script = document.createElement('script');
             script.src = '/static/js/filters.js';

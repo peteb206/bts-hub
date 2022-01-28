@@ -10,9 +10,8 @@ def stop_timer(function_name, start_time):
     print('{} time: {}'.format(function_name, datetime.timedelta(seconds = round(time.time() - start_time))))
 
 
-def utc_to_central(time_string, return_type='time'):
-    game_time_utc = datetime.datetime.strptime(time_string, '%Y-%m-%dT%H:%M:%SZ').replace(tzinfo=tz.gettz('UTC'))
-    game_time_current_time_zone = game_time_utc.astimezone(tz.gettz('America/Chicago'))
+def utc_to_central(game_time_utc, return_type='time'):
+    game_time_current_time_zone = game_time_utc.tz_localize('UTC').astimezone(tz.gettz('America/Chicago'))
     format = '%I:%M %p %Z' if return_type == 'time' else '%Y-%m-%d'
     return game_time_current_time_zone.strftime(format)
 

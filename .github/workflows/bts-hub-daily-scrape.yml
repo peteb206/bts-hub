@@ -25,7 +25,7 @@ jobs:
                python data.py daily
          -  name: get past year to update in database
             id: year
-            run: echo "::set-output name=year::year=$(($(date +%u)+2014))"
+            run: echo "::set-output name=year::$(($(date +%u)+2014))"
          -  name: update database with past year's data
             env:
                DATABASE_CLIENT: ${{ secrets.DATABASE_CLIENT }}

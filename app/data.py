@@ -169,7 +169,7 @@ class BTSHubMongoDB:
         df = pd.DataFrame(list(agg))
         df['gamePk'] = df['_id'].apply(lambda x: x['gamePk'])
         df['gameDate'] = df['_id'].apply(lambda x: (x['gameDateTimeUTC'] - timedelta(hours=5)).replace(hour=0, minute=0, second=0)) # This should help align with game dates
-        df.drop(['_id', 'xBA', 'gameDateTimeUTC'], axis=1, inplace=True)
+        df.drop(['_id', 'xBA'], axis=1, inplace=True)
         df['statcastFlag'] = True
         return df
 

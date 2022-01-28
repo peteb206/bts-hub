@@ -76,7 +76,7 @@ def render_content(path):
                     del query_parameters_dict['year']
     content_html = ''
     if path in ['games', 'atBats', 'players', 'teams', 'stadiums']:
-        content_html = db.read_collection_to_html_table(path, where_dict=query_parameters_dict)
+        content_html = html_utils.display_html(db, path, filters=query_parameters_dict)
     return render_template(
         'content.html', # f'{path}.html'
         current_path=path,

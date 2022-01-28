@@ -12,8 +12,8 @@ def stop_timer(function_name, start_time):
 
 def utc_to_central(game_time_utc, return_type='time'):
     game_time_current_time_zone = game_time_utc.tz_localize('UTC').astimezone(tz.gettz('America/Chicago'))
-    format = '%I:%M %p %Z' if return_type == 'time' else '%Y-%m-%d'
-    return game_time_current_time_zone.strftime(format)
+    datetime_string = game_time_current_time_zone.strftime('%I:%M %p %Z' if return_type == 'time' else '%Y-%m-%d')
+    return datetime_string[1:] if (return_type == 'time') & (datetime_string[0] == '0') else datetime_string
 
 
 def lineup_func(lineups, player_id, team):

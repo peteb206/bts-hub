@@ -8,8 +8,14 @@ $(window).on('load', function () {
         success: function(contentHTML) {
             $('#content').append(contentHTML);
             $('table.display').each(function() {
-                $(this).DataTable({
-                    order: []
+                var thisTable = $(this)
+                thisTable.DataTable({
+                    order: [],
+                    rowCallback: function(row) {
+                        $('td', row).each(function() {
+                            $(this).html('<div class="scrollingCell">' + $(this).text() + '</div>');
+                        });
+                    }
                 });
             });
             let script = document.createElement('script');

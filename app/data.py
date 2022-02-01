@@ -212,6 +212,7 @@ class BTSHubMongoDB:
                 'eventTypeId': i,
                 'inputEventType': event.replace('..', ' '),
                 'outputEventType': event.replace('..', '_'),
+                'eventTypeName': event_input.parent.find('label').text.strip(),
                 'inPlayFlag': event in ball_in_play_list,
                 'hitFlag': event in hit_list
             })
@@ -219,7 +220,7 @@ class BTSHubMongoDB:
         df = pd.DataFrame(events_list)
 
         # Clean up dataframe
-        return df[['eventTypeId', 'inputEventType', 'outputEventType', 'inPlayFlag', 'hitFlag']]
+        return df[['eventTypeId', 'inputEventType', 'outputEventType', 'eventTypeName', 'inPlayFlag', 'hitFlag']]
 
 
     def get_stadiums_from_mlb(self):

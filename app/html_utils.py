@@ -2,9 +2,9 @@ try:
     import app.utils as utils
 except ModuleNotFoundError:
     import utils
-from numpy import where
 import pandas as pd
 import re
+from datetime import datetime
 
 
 def sidebar_links_html(db, current_endpoint, collapse_sidebar):
@@ -19,7 +19,7 @@ def sidebar_links_html(db, current_endpoint, collapse_sidebar):
         ['Simulations', 'fas fa-chart-bar', '/simulations'],
         ['Data', 'fas fa-database', '/dataView'],
         ['Games', 'fas fa-calendar-alt', f'/games?startDate={game_dates[0]}&endDate={game_dates[-1]}'],
-        ['At Bats', 'fas fa-baseball-ball', f'/atBats?startDate={available_dates[-10]}&endDate={available_dates[-1]}'],
+        ['At Bats', 'fas fa-baseball-ball', f'/atBats?startDate={available_dates[-7]}&endDate={available_dates[-1]}'],
         ['Players', 'fas fa-users', f'/players?year={year}'],
         ['Teams', 'fas fa-trophy', f'/teams?year={year}'],
         ['Stadiums', 'fas fa-university', f'/stadiums?year={year}'],
@@ -98,15 +98,15 @@ def html_table(table_id, data):
         if len(column_list) == 0:
             column_list = [' ']
         thead = ''.join([f'<th>{column}</th>' for column in convert_camel_case_columns(column_list)])
-        return f'<table id="{table_id}" class="display"><thead>{thead}</thead><tbody>{tbody}</tbody></table>'
+        return f'<table id="{table_id}" class="display nowrap"><thead>{thead}</thead><tbody>{tbody}</tbody></table>'
     else:
         data.columns = convert_camel_case_columns(data.columns)
-        df = data.to_html(na_rep='', table_id=table_id, classes='display', border=0, justify='unset', index=False)
+        df = data.to_html(na_rep='', table_id=table_id, classes='display nowrap', border=0, justify='unset', index=False)
         return df
 
 
 def convert_camel_case_columns(column_list):
-    return [re.sub(r'((?<=[a-z])[A-Z]|(?<!\A)[A-Z](?=[a-z]))', r' \1', column[0].upper() + column[1:]) for column in column_list]
+    return [re.sub(r'((?<=[a-z])[A-Z]|(?<!\A)[A-Z](?=[a-z]))', r' \1', (column[0].upper() if column[0] != 'x' else 'x') + column[1:]).replace('x ', 'x') for column in column_list]
 
 
 def format_table_value(value):
@@ -116,7 +116,7 @@ def format_table_value(value):
 
 
 def display_html(db, path, filters={}):
-    html = ''
+    html, current_year = '', datetime.now().year
     if path in ['games', 'atBats']:
         df = db.read_collection(path, where_dict=filters)
         display_columns = list()
@@ -138,7 +138,7 @@ def display_html(db, path, filters={}):
         for side in ['away', 'home']:
             if path == 'games':
                 df[f'{side}Starter'] = df[f'{side}StarterId'].apply(lambda x: player_id_dict[x] if x in player_id_dict_keys else '')
-                df[f'{side}Lineup'] = df[f'{side}Lineup'].apply(lambda x: ' | '.join([f'{(k + 1)}. {v}' for k, v in enumerate([player_id_dict[player_id] if player_id in player_id_dict_keys else '' for player_id in list(x)])]))
+                df[f'{side}Lineup'] = df[f'{side}Lineup'].apply(lambda x: '<ol>{}</ol>'.format(''.join([f'<li>{player_id_dict[player_id]}</li>' if player_id in player_id_dict_keys else '' for player_id in list(x)])))
             else:
                 df['lineupSlot'] = df.apply(lambda row: str(row[f'{side}Lineup'].index(row['batterId']) + 1) if (row['lineupSlot'] == '') & (row['batterId'] in row[f'{side}Lineup']) else row['lineupSlot'], axis=1)
             df = pd.merge(df, teams_df, how='left', left_on=['year', f'{side}TeamId'], right_on=['year', 'teamId']).rename({'teamAbbreviation': f'{side}Team'}, axis=1)
@@ -146,11 +146,26 @@ def display_html(db, path, filters={}):
             df['batter'] = df.apply(lambda row: f'{player_id_dict[row["batterId"]]} ({"R" if row["rightHandedBatterFlag"] else "L"})' if row['batterId'] in player_id_dict_keys else '', axis=1)
             df['pitcher'] = df.apply(lambda row: f'{player_id_dict[row["pitcherId"]]} ({"R" if row["rightHandedPitcherFlag"] else "L"})' if row['pitcherId'] in player_id_dict_keys else '', axis=1)
             df['inning'] = df.apply(lambda row: f'{row["inning"]} ({"Bottom" if row["inningBottomFlag"] else "Top"})', axis=1)
-            df = pd.merge(df, db.read_collection('eventTypes').rename({'outputEventType': 'outcome'}, axis=1), how='left', on='eventTypeId')
+            df = pd.merge(df, db.read_collection('eventTypes').rename({'eventTypeName': 'outcome'}, axis=1), how='left', on='eventTypeId')
         else:
             df = pd.merge(df, db.read_collection('stadiums')[['stadiumId', 'stadiumName']], how='left', on='stadiumId')
-        df['matchup'] = df.apply(lambda row: '{} @ {}{}'.format(row['awayTeam'], row['homeTeam'], f' ({row["awayScore"]} - {row["awayScore"]})' if row['awayScore'] + row['homeScore'] >= 0 else ''), axis=1)
+        df['matchup'] = df.apply(lambda row: '{} @ {}{}'.format(row['awayTeam'], row['homeTeam'], f' ({row["awayScore"]} - {row["homeScore"]})' if row['awayScore'] + row['homeScore'] >= 0 else ''), axis=1)
         df.rename({'statcastFlag': 'statcastTracked?', 'stadiumName': 'stadium'}, axis=1, inplace=True)
+        html = html_table('dataView', df[display_columns])
+    elif path == 'players':
+        display_columns = ['name', 'position', 'bats', 'throws', 'G', 'HG', 'H %', 'xH / G']
+        df = db.read_collection(path, where_dict=filters)
+        df['playerName'] = df.apply(lambda row: f'<span>{row["playerName"]} </span><i class="fas fa-plus-square injuredIcon"></i>' if (current_year == row['year']) & (row['injuredFlag']) else row["playerName"], axis=1)
+        if 'year' in filters.keys():
+            batter_season_df = pd.DataFrame(utils.batter_spans(db, where_dict={'gameDateTimeUTC': {'$gte': datetime(filters['year'], 1, 1), '$lte': datetime(filters['year'], 12, 31)}}))
+            if len(batter_season_df.index) > 0:
+                df = pd.merge(df, batter_season_df, how='left', left_on='playerId', right_on='batterId')
+            else:
+                df['G'] = 0
+                df['HG'] = 0
+                df['H %'] = 0
+                df['xH / G'] = 0
+        df.rename({'playerName': 'name', 'xH': 'xH / G'}, axis=1, inplace=True)
         html = html_table('dataView', df[display_columns])
     elif path == 'stadiums':
         park_factor_filter, display_columns = dict(), ['stadiumName', 'time', 'batterHand', 'parkFactor']

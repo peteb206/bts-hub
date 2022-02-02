@@ -77,11 +77,11 @@ def filters_html(filter_types, filter_values):
         filter_html += '<div class="col-auto">'
         filter_html +=    '<button type="button" id="updateFiltersButtonInactive" class="btn btn-secondary">'
         filter_html +=       '<i class="fas fa-sync"></i>'
-        filter_html +=       '<span class="buttonText">Update</span>'
+        filter_html +=       '<span class="buttonText">Go</span>'
         filter_html +=    '</button>'
         filter_html +=    '<button type="button" id="updateFiltersButtonActive" class="btn btn-secondary hidden">'
         filter_html +=       '<i class="fas fa-sync"></i>'
-        filter_html +=       '<span class="buttonText">Update</span>'
+        filter_html +=       '<span class="buttonText">Go</span>'
         filter_html +=    '</button>'
         filter_html += '</div>'
     return filter_html
@@ -116,10 +116,9 @@ def format_table_value(value):
 
 
 def display_html(db, path, filters={}):
-    html, current_year = '', datetime.now().year
+    df, display_columns, current_year = None, None, datetime.now().year
     if path in ['games', 'atBats']:
         df = db.read_collection(path, where_dict=filters)
-        display_columns = list()
         if path == 'games':
             display_columns = ['date', 'time', 'matchup', 'awayStarter', 'homeStarter', 'awayLineup', 'homeLineup', 'stadium', 'statcastTracked?']
         else:
@@ -151,7 +150,6 @@ def display_html(db, path, filters={}):
             df = pd.merge(df, db.read_collection('stadiums')[['stadiumId', 'stadiumName']], how='left', on='stadiumId')
         df['matchup'] = df.apply(lambda row: '{} @ {}{}'.format(row['awayTeam'], row['homeTeam'], f' ({row["awayScore"]} - {row["homeScore"]})' if row['awayScore'] + row['homeScore'] >= 0 else ''), axis=1)
         df.rename({'statcastFlag': 'statcastTracked?', 'stadiumName': 'stadium'}, axis=1, inplace=True)
-        html = html_table('dataView', df[display_columns])
     elif path == 'players':
         display_columns = ['name', 'position', 'bats', 'throws', 'G', 'HG', 'H %', 'xH / G']
         df = db.read_collection(path, where_dict=filters)
@@ -159,26 +157,42 @@ def display_html(db, path, filters={}):
         if 'year' in filters.keys():
             batter_season_df = pd.DataFrame(utils.batter_spans(db, where_dict={'gameDateTimeUTC': {'$gte': datetime(filters['year'], 1, 1), '$lte': datetime(filters['year'], 12, 31)}}))
             if len(batter_season_df.index) > 0:
+                batter_season_df[['G', 'HG']] = batter_season_df[['G', 'HG']].astype(str)
+                batter_season_df['H %'] = batter_season_df['H %'].apply(lambda x: f'{round(x * 100, 2)} %')
+                batter_season_df['xH / G'] = batter_season_df['xH'].round(2).astype(str)
                 df = pd.merge(df, batter_season_df, how='left', left_on='playerId', right_on='batterId')
             else:
-                df['G'] = 0
-                df['HG'] = 0
-                df['H %'] = 0
-                df['xH / G'] = 0
-        df.rename({'playerName': 'name', 'xH': 'xH / G'}, axis=1, inplace=True)
-        html = html_table('dataView', df[display_columns])
+                df['G'] = ''
+                df['HG'] = ''
+                df['H %'] = ''
+                df['xH / G'] = ''
+        df.rename({'playerName': 'name'}, axis=1, inplace=True)
+        df.sort_values(by=['H %', 'xH / G'], ascending=False, inplace=True)
+    elif path == 'teams':
+        display_columns = ['teamAbbreviation', 'teamName', 'divisionName', 'xHA / G', 'HA / G', 'xH / G', 'H / G']
+        df = db.read_collection(path, where_dict=filters)
+        date_filter = dict()
+        if 'year' in filters.keys():
+            startDate, endDate = datetime(filters['year'], 1, 1), datetime(filters['year'], 12, 31)
+            date_filter = {'gameDateTimeUTC': {'$gte': startDate, '$lte': endDate}}
+        team_games_df = pd.DataFrame(utils.team_games(db, where_dict=date_filter))
+        team_games_df = pd.merge(team_games_df, db.read_collection('games', where_dict=date_filter), on=['gamePk', 'gameDateTimeUTC'])
+        team_games_df['pitchingTeamId'] = team_games_df.apply(lambda row: row['awayTeamId'] if row['inningBottomFlag'] else row['homeTeamId'], axis=1)
+        team_games_df['battingTeamId'] = team_games_df.apply(lambda row: row['homeTeamId'] if row['inningBottomFlag'] else row['awayTeamId'], axis=1)
+        team_pitching_agg = team_games_df.groupby('pitchingTeamId')[['xBA', 'hits']].mean().reset_index()
+        team_batting_agg = team_games_df.groupby('battingTeamId')[['xBA', 'hits']].mean().reset_index()
+        df = pd.merge(df, team_pitching_agg, how='left', left_on='teamId', right_on='pitchingTeamId').rename({'xBA': 'xHA / G', 'hits': 'HA / G'}, axis=1)
+        df = pd.merge(df, team_batting_agg, how='left', left_on='teamId', right_on='battingTeamId').rename({'xBA': 'xH / G', 'hits': 'H / G'}, axis=1).round(2)
+        df.sort_values(by=['H / G', 'xH / G'], ascending=False, inplace=True)
     elif path == 'stadiums':
-        park_factor_filter, display_columns = dict(), ['stadiumName', 'time', 'batterHand', 'parkFactor']
+        display_columns = ['stadiumName', 'rightyDayParkFactor', 'leftyDayParkFactor', 'rightyNightParkFactor', 'leftyNightParkFactor']
+        park_factor_filter = dict()
         if 'year' in filters.keys():
             park_factor_filter['year'] = filters['year']
-        else:
-            display_columns = ['year'] + display_columns
-        park_factors_df = db.read_collection('parkFactors', where_dict=park_factor_filter)
-        park_factors_df['time'] = park_factors_df['dayGameFlag'].apply(lambda x: 'Day' if x else 'Night')
-        park_factors_df['batterHand'] = park_factors_df['rightHandedFlag'].apply(lambda x: 'Right' if x else 'Left')
-        df = pd.merge(db.read_collection(path), park_factors_df, how='right', on='stadiumId')
-        df.sort_values(by='parkFactor', ascending=False, inplace=True)
-        html = html_table('dataView', df[display_columns])
-    else:
-        html = db.read_collection_to_html_table(path, where_dict=filters)
-    return html
+        pf_df = db.read_collection('parkFactors', where_dict=park_factor_filter)
+        pf_df = pf_df.pivot_table(index=['year', 'stadiumId'], columns=['rightHandedFlag', 'dayGameFlag'], values='parkFactor', aggfunc='first').reset_index()
+        pf_df.columns = [f'{"righty" if col[0] else "lefty"}{"Day" if col[1] else "Night"}ParkFactor' if isinstance(col[0], bool) & isinstance(col[1], bool) else col[0] for col in pf_df.columns]
+        df = pd.merge(db.read_collection(path), pf_df, how='right', on='stadiumId')
+        df.sort_values(by=['rightyNightParkFactor', 'leftyNightParkFactor'], ascending=False, inplace=True)
+    df[' '] = '<i class="fas fa-arrow-circle-right"></i>'
+    return html_table('dataView', df[[' '] + display_columns])

@@ -293,3 +293,43 @@ def batter_spans(db, where_dict={}):
     batters_pipeline = pipeline_builder(group_list=['batterId'], agg_list=batters_agg_list, extra_stages_list=extra_stages_list)
     pipeline = games_pipeline + batters_pipeline
     return list(db.get_db()['atBats'].aggregate(pipeline))
+
+
+def team_games(db, where_dict={}):
+    event_types = db.read_collection_as_list('eventTypes')
+    hit_event_type_ids = [event_type['eventTypeId'] for event_type in event_types if event_type['hitFlag']]
+    games_agg_list = [
+        {
+            'column': 'xBA',
+            'agg_operator': 'sum',
+            'agg_function': {
+                '$cond': [
+                    {
+                        '$gte': [
+                            '$xBA',
+                            0
+                        ]
+                    },
+                    '$xBA',
+                    0
+                ]
+            }
+        }, {
+            'column': 'hits',
+            'agg_operator': 'sum',
+            'agg_function': {
+                '$cond': [
+                    {
+                        '$in': [
+                            '$eventTypeId',
+                            hit_event_type_ids
+                        ]
+                    },
+                    1,
+                    0
+                ]
+            }
+        }
+    ]
+    pipeline = pipeline_builder(where_dict=where_dict, group_list=['gamePk', 'gameDateTimeUTC', 'inningBottomFlag'], agg_list=games_agg_list)
+    return list(db.get_db()['atBats'].aggregate(pipeline))

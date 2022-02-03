@@ -22,7 +22,7 @@ def base():
 def render_page(path):
     query_parameters_dict = utils.parse_request_arguments(request.args)
     if (path == 'dashboard') & ('date' not in query_parameters_dict.keys()):
-        return redirect(f'/dashboard?date={utils.get_available_dates(db, max_min="max")}')
+        return redirect(f'/dashboard?date={db.get_available_dates(max_min="max")}')
     collapse_sidebar = request.cookies.get('collapseSidebar') == 'true'
     return render_template(
         'base.html',
@@ -39,7 +39,9 @@ def render_content(path):
     filter_types, filter_values = list(), None
     if 'date' in query_parameters:
         filter_types.append('date')
-        filter_values = datetime.datetime.strptime(query_parameters_dict['date'], '%Y-%m-%d')
+        date_string_as_datetime = datetime.datetime.strptime(query_parameters_dict['date'], '%Y-%m-%d')
+        query_parameters_dict['date'] = date_string_as_datetime
+        filter_values = date_string_as_datetime
     elif ('startDate' in query_parameters) | ('endDate' in query_parameters):
         filter_types.append('date_range')
         filter_values = list()
@@ -74,14 +76,11 @@ def render_content(path):
                         '$lte': datetime.datetime(query_parameters_dict['year'], 12, 31)
                     }
                     del query_parameters_dict['year']
-    content_html = ''
-    if path in ['games', 'atBats', 'players', 'teams', 'stadiums']:
-        content_html = html_utils.display_html(db, path, filters=query_parameters_dict)
     return render_template(
         'content.html', # f'{path}.html'
         current_path=path,
         filters_html=html_utils.filters_html(filter_types, filter_values),
-        content_html=content_html
+        content_html=html_utils.display_html(db, path, filters=query_parameters_dict)
     )
 ####################################
 ######### End HTML Pages ###########
@@ -92,7 +91,7 @@ def render_content(path):
 ####################################
 @app.route('/data/availableDates')
 def available_dates():
-    return jsonify({'data': utils.get_available_dates(db)})
+    return jsonify({'data': db.get_available_dates()})
 
 
 @app.route('/data/<collection>')

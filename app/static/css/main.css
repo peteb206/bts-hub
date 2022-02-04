@@ -40,9 +40,10 @@ div.scrollingCell {
 .datePickerLabel {
     padding-right: 5px;
 }
-.datePickerIcon {
+.datePickerIcon, .rowSelectorIcon {
     color: var(--main-color);
-    background-color: var(--secondary-color);
+    /* background-color: var(--secondary-color); */
+    background: transparent;
 }
 .injuredIcon {
     color: red;

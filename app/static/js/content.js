@@ -7,16 +7,18 @@ $(window).on('load', function () {
         dataType: 'html',
         success: function(contentHTML) {
             $('#content').append(contentHTML);
+            var dataTables = [];
             $('table.display').each(function() {
-                var thisTable = $(this)
-                thisTable.DataTable({
+                var thisTable = $(this);
+                var thisDataTable = thisTable.DataTable({
                     order: [],
                     rowCallback: function(row) {
                         $('td', row).each(function() {
-                            $(this).html('<div class="scrollingCell">' + $(this).text() + '</div>');
+                            $(this).html('<div class="scrollingCell">' + ($(this).text() || $(this).html()) + '</div>');
                         });
                     }
                 });
+                dataTables.push(thisDataTable);
             });
             let script = document.createElement('script');
             script.src = '/static/js/filters.js';

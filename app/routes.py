@@ -49,14 +49,14 @@ def render_content(path):
         collection_column_names = list(collection_columns.keys())
         for date_boundary in ['startDate', 'endDate']:
             if date_boundary in query_parameters:
-                date_boundary_value = datetime.datetime.strptime(query_parameters_dict[date_boundary], '%Y-%m-%d')
+                date_boundary_value = datetime.datetime.strptime(query_parameters_dict[date_boundary], '%Y-%m-%d') + datetime.timedelta(hours=5)
                 filter_values.append(date_boundary_value)
                 for column in collection_column_names:
                     if collection_columns[column] == 'datetime':
                         operator = '$gte'
                         if date_boundary == 'endDate':
                             operator = '$lte'
-                            date_boundary_value = date_boundary_value.replace(hour=23, minute=59)
+                            date_boundary_value = date_boundary_value + datetime.timedelta(hours=24)
                         if column not in query_parameters:
                             query_parameters_dict[column] = dict()
                         query_parameters_dict[column][operator] = date_boundary_value

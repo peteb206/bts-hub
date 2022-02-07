@@ -78,11 +78,11 @@ def filters_html(filter_types, filter_values):
         filter_html += '<div class="col-auto">'
         filter_html +=    '<button type="button" id="updateFiltersButtonInactive" class="btn btn-secondary">'
         filter_html +=       '<i class="fas fa-sync"></i>'
-        filter_html +=       '<span class="buttonText">Go</span>'
+        filter_html +=       '<span class="buttonText refreshFilter">Go</span>'
         filter_html +=    '</button>'
         filter_html +=    '<button type="button" id="updateFiltersButtonActive" class="btn btn-secondary hidden">'
         filter_html +=       '<i class="fas fa-sync"></i>'
-        filter_html +=       '<span class="buttonText">Go</span>'
+        filter_html +=       '<span class="buttonText refreshFilter">Go</span>'
         filter_html +=    '</button>'
         filter_html += '</div>'
     return filter_html
@@ -127,16 +127,15 @@ def display_html(db, path, filters={}):
     if path == 'dashboard':
         date = filters['date']
         html =  '<div class="row">'
-        html +=    '<div class="col">'
+        html +=    '<div class="col-6">'
         html +=       '<h4>Recent Performance</h4>'
-        html +=       html_table('recentPerformances', db.batter_span(where_dict={'gameDateTimeUTC': {'$gte': datetime(date.year, 1, 1), '$lte': datetime(date.year, 12, 31)}}))
+        html +=       html_table('recentPerformances', db.recent_batter_performances(date=date))
         html +=    '</div>'
-        html +=    '<div class="col">'
+        html +=    '<div class="col-6">'
         html +=       "<h4>Today's Games</h4>"
-        html +=       html_table('todaysGames', db.game_span(where_dict={'gameDateTimeUTC': {'$gte': date + timedelta(hours=5), '$lte': date + timedelta(hours=30)}}))
+        html +=       html_table('todaysGames', db.dashboard_games(date=date))
         html +=    '</div>'
         html += '</div>'
-        return html
     elif path == 'games':
         html = html_table('dataView', db.game_span(where_dict=filters))
     elif path == 'atBats':

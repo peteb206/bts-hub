@@ -1,6 +1,7 @@
 :root {
     --main-color: #165916;
     --secondary-color: #e1e8ef;
+    --content-font-size: 13px;
 }
 body {
     font-family: 'Open Sans';
@@ -71,8 +72,8 @@ div.scrollingCell {
 .spinner-grow {
     margin-bottom: 10px;
 }
-#main-content {
-    font-size: 13px;
+div#content, .refreshFilter {
+    font-size: var(--content-font-size);
 }
 #rightBody {
     position: relative;

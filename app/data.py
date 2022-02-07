@@ -273,7 +273,7 @@ class BTSHubMongoDB:
         teams_df = pd.DataFrame(teams_dict['teams'])[['season', 'id', 'abbreviation', 'name', 'division']]
 
         # Calculated columns
-        teams_df['divisionName'] = teams_df['division'].apply(lambda x: ''.join([y[0] if y in ['American', 'National', 'League'] else f' {y}' for y in x.split()]))
+        teams_df['divisionName'] = teams_df['division'].apply(lambda x: ''.join([y[0] if y in ['American', 'National', 'League'] else f' {y}' for y in x['name'].split()]))
 
         # Clean up dataframe
         teams_df.rename({'season': 'year', 'id': 'teamId', 'abbreviation': 'teamAbbreviation', 'name': 'teamName'}, axis=1, inplace=True)
@@ -1305,6 +1305,249 @@ class BTSHubMongoDB:
                             ]
                         }
                     }
+                }
+            }
+        ])
+
+
+    def dashboard_games(self, date=None):
+        return self.get_db()['games'].aggregate([
+            {
+                '$match': {'gameDateTimeUTC': {'$gte': date + timedelta(hours=5), '$lte': date + timedelta(hours=30)}}
+            }, {
+                '$lookup': {
+                    'from': 'teams',
+                    'let': {
+                        'awayTeamId': '$awayTeamId',
+                        'year': {
+                            '$year': '$gameDateTimeUTC'
+                        }
+                    },
+                    'pipeline': [
+                        {
+                            '$match': {
+                                '$expr': {
+                                    '$and': [
+                                        {
+                                            '$eq': [
+                                                '$year',
+                                                '$$year'
+                                            ]
+                                        }, {
+                                            '$eq': [
+                                                '$teamId',
+                                                '$$awayTeamId'
+                                            ]
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    ],
+                    'as': 'awayTeam'
+                }
+            }, {
+                '$lookup': {
+                    'from': 'teams',
+                    'let': {
+                        'homeTeamId': '$homeTeamId',
+                        'year': {
+                            '$year': '$gameDateTimeUTC'
+                        }
+                    },
+                    'pipeline': [
+                        {
+                            '$match': {
+                                '$expr': {
+                                    '$and': [
+                                        {
+                                            '$eq': [
+                                                '$year',
+                                                '$$year'
+                                            ]
+                                        }, {
+                                            '$eq': [
+                                                '$teamId',
+                                                '$$homeTeamId'
+                                            ]
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    ],
+                    'as': 'homeTeam'
+                }
+            }, {
+                '$lookup': {
+                    'from': 'players',
+                    'let': {
+                        'awayStarterId': '$awayStarterId',
+                        'year': {
+                            '$year': '$gameDateTimeUTC'
+                        }
+                    },
+                    'pipeline': [
+                        {
+                            '$match': {
+                                '$expr': {
+                                    '$and': [
+                                        {
+                                            '$eq': [
+                                                '$year',
+                                                '$$year'
+                                            ]
+                                        }, {
+                                            '$eq': [
+                                                '$playerId',
+                                                '$$awayStarterId'
+                                            ]
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    ],
+                    'as': 'awayStarter'
+                }
+            }, {
+                '$lookup': {
+                    'from': 'players',
+                    'let': {
+                        'homeStarterId': '$homeStarterId',
+                        'year': {
+                            '$year': '$gameDateTimeUTC'
+                        }
+                    },
+                    'pipeline': [
+                        {
+                            '$match': {
+                                '$expr': {
+                                    '$and': [
+                                        {
+                                            '$eq': [
+                                                '$year',
+                                                '$$year'
+                                            ]
+                                        }, {
+                                            '$eq': [
+                                                '$playerId',
+                                                '$$homeStarterId'
+                                            ]
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    ],
+                    'as': 'homeStarter'
+                }
+            }, {
+                '$unwind': '$awayTeam'
+            }, {
+                '$unwind': '$homeTeam'
+            }, {
+                '$unwind': {
+                    'path': '$awayStarter',
+                    'preserveNullAndEmptyArrays': True
+                }
+            }, {
+                '$unwind': {
+                    'path': '$homeStarter',
+                    'preserveNullAndEmptyArrays': True
+                }
+            }, {
+                '$sort': {
+                    'gameDateTimeUTC': 1
+                }
+            }, {
+                '$project': {
+                    '_id': 0,
+                    'time': {
+                        '$dateToString': {
+                            'format': '%H:%M',
+                            'date': '$gameDateTimeUTC',
+                            'timezone': '-05:00'
+                        }
+                    },
+                    'matchup': {
+                        '$concat': [
+                            '$awayTeam.teamAbbreviation',
+                            ' @ ',
+                            '$homeTeam.teamAbbreviation'
+                        ]
+                    },
+                    'awayStarter': '$awayStarter.playerName',
+                    'homeStarter': '$homeStarter.playerName',
+                    'weather': '$weather',
+                    'temperature': {
+                        '$concat': [
+                            '$temperature',
+                            u'\N{DEGREE SIGN}'
+                        ]
+                    }
+                }
+            }
+        ])
+
+
+    def recent_batter_performances(self, date={}):
+        # TO DO: prepare data for input in logistic regression model
+        return self.get_db()['players'].aggregate([
+            {
+                '$match': {
+                    '$and': [
+                        {
+                            'year': date.year
+                        }, {
+                            '$or': [
+                                {
+                                    'position': {
+                                        '$ne': 'P'
+                                    }
+                                }, {
+                                    'playerId': 660271
+                                }
+                            ]
+                        }
+                    ]
+                }
+            }, {
+                '$lookup': {
+                    'from': 'teams',
+                    'let': {
+                        'teamId': '$teamId'
+                    },
+                    'pipeline': [
+                        {
+                            '$match': {
+                                '$expr': {
+                                    '$and': [
+                                        {
+                                            '$eq': [
+                                                '$teamId',
+                                                '$$teamId'
+                                            ]
+                                        }, {
+                                            '$eq': [
+                                                '$year',
+                                                date.year
+                                            ]
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    ],
+                    'as': 'team'
+                }
+            }, {
+                '$unwind': '$team'
+            }, {
+                '$project': {
+                    '_id': 0,
+                    'name': '$playerName',
+                    'team': '$team.teamAbbreviation'
                 }
             }
         ])

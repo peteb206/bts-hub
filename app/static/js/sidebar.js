@@ -6,8 +6,13 @@ $(document).ready(function () {let sidebarToggle = function () {
                 '#sidebarCollapse': true,
                 '#sidebarCollapsed': false,
                 '.fullSidebarTab': true,
-                '.partialSidebarTab': false,
-                'img': true
+                '.partialSidebarTab': false
+            },
+            'collapsed': {
+                '.components': true
+            },
+            'sidebarImageCollapsed': {
+                '.sidebarImage': true
             }
         }
 

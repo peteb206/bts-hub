@@ -93,11 +93,25 @@ div#content, .refreshFilter {
     min-width: 70px;
     max-width: 70px;
 }
-#sidebarCollapse, #sidebarCollapsed {
+#sidebarCollapseDiv {
     position: fixed;
-    bottom: 10px;
+    bottom: 0px;
+    padding: 10px 0px;
+    border-top: 1px solid var(--secondary-color);
+}
+.sidebarCollapseButton {
     color: var(--main-color);
-    background-color: #E8E8E8;
+    background-color: var(--secondary-color);
+}
+.sidebarCollapseButton:hover {
+    color: var(--main-color);
+    background-color: var(--secondary-color);
+}
+#sidebarCollapse {
+    width: 200px;
+}
+#sidebarCollapsed {
+    width: 70px;
 }
 .buttonText {
     margin-left: 10px;
@@ -111,21 +125,28 @@ a, a:hover, a:focus {
     padding: 20px;
     padding-bottom: 10px;
     background: var(--main-color);
+    border-bottom: 1px solid var(--secondary-color);
 }
 #partialSidebarHeader {
     padding: 5px;
+    border-bottom: 1px solid var(--secondary-color);
 }
 #sidebar ul.components {
-    padding: 20px 0;
-    border-top: 1px solid var(--secondary-color);
-    border-bottom: 1px solid var(--secondary-color);
+    position: relative;
+    padding: 5px 0;
+    height: calc(100vh - 165px);
+    overflow: auto;
+}
+
+#sidebar ul.collapsed {
+    height: calc(100vh - 145px);
 }
 #sidebar ul li a {
     padding: 10px;
     font-size: 1.1em;
     display: block;
 }
-#sidebar ul li a:hover {
+#sidebar ul li.inactive a:hover {
     color: var(--main-color);
     background: var(--secondary-color);
     border-left: 3px solid var(--main-color);

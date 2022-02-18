@@ -39,16 +39,15 @@
             <div id="partialSidebarHeader" class="text-center {% if not collapse_sidebar %} hidden {% endif %}">
                <h3>BTS Hub</h3>
             </div>
-            <ul id="sidebarTabs" class="list-unstyled components">
+            <ul class="list-unstyled components {% if collapse_sidebar %} collapsed {% endif %}">
                {{ sidebar_links_html|safe }}
             </ul>
-            <div class="container-fluid">
-               <img src="{{url_for('static', filename='img/rogers_centre.jpeg')}}" id="sidebarImage" {% if collapse_sidebar %} class="hidden" {% endif %}>
-               <button type="button" id="sidebarCollapse" class="btn btn-secondary {% if collapse_sidebar %} hidden {% endif %}">
+            <div id="sidebarCollapseDiv">
+               <button type="button" id="sidebarCollapse" class="btn btn-secondary {% if collapse_sidebar %} hidden {% endif %} sidebarCollapseButton">
                   <i class="fas fa-angle-double-left"></i>
                   <span class="buttonText">Collapse Sidebar</span>
                </button>
-               <button type="button" id="sidebarCollapsed" class="btn btn-secondary {% if not collapse_sidebar %} hidden {% endif %}" title="Expand Sidebar">
+               <button type="button" id="sidebarCollapsed" class="btn btn-secondary {% if not collapse_sidebar %} hidden {% endif %} sidebarCollapseButton" title="Expand Sidebar">
                   <i class="fas fa-angle-double-right"></i>
                </button>
             </div>

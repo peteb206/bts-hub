@@ -310,9 +310,10 @@ class BTSHubMongoDB:
         games_list = list()
         for date in games_dict['dates']:
             games_list += date['games']
-        games_df = pd.DataFrame(games_list)[['gameDate', 'officialDate', 'gamePk', 'teams', 'lineups', 'venue', 'dayNight', 'weather']]
+        games_df = pd.DataFrame(games_list)
+        games_df = games_df[[col for col in ['gameDate', 'officialDate', 'gamePk', 'teams', 'lineups', 'venue', 'dayNight', 'weather'] if col in games_df.columns]]
         for col in ['lineups', 'weather']:
-            games_df[col] = games_df[col].apply(lambda x: x if isinstance(x, dict) else dict())
+            games_df[col] = games_df.apply(lambda row: dict() if col not in row.keys() else row[col] if isinstance(row[col], dict) else dict(), axis=1)
         for side in ['away', 'home']:
             games_df[f'{side}TeamId'] = games_df['teams'].apply(lambda x: x[side]['team']['id'])
             games_df[f'{side}Score'] = games_df['teams'].apply(lambda x: x[side]['score'] if 'score' in x[side].keys() else -1)

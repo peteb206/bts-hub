@@ -33,7 +33,7 @@ def sidebar_links_html(db, current_endpoint, collapse_sidebar):
         partial_sidebar_hidden = ' hidden'
     for list_item in list_items:
         active = current_endpoint == list_item[2].split('?')[0]
-        list_items_html += '<li title="' + list_item[0] + '"' + (' class="active">' if active else '>')
+        list_items_html += '<li title="' + list_item[0] + '"' + ' class="' + ('active' if active else 'inactive') + '">'
         list_items_html +=    '<a href="' + ('#' if active else list_item[2]) + '">'
         list_items_html +=       '<div class="fullSidebarTab' + full_sidebar_hidden + '">'
         list_items_html +=          '<i class="' + list_item[1] + '"></i>'

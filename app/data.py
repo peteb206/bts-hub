@@ -329,6 +329,7 @@ class BTSHubMongoDB:
         games_df['weather'] = games_df['weather'].apply(lambda x: x['condition'] if 'condition' in x.keys() else '')
 
         # Clean up dataframe
+        games_df = games_df[games_df['gameDate'] <= datetime.now().replace(hour=23, minute=59, second=59)] # Don't try to get games way in future
         games_df.sort_values(by=['gamePk', 'gameDateTimeUTC'], ignore_index=True, inplace=True)
         return games_df[['gamePk', 'gameDateTimeUTC', 'awayTeamId', 'homeTeamId', 'awayScore', 'homeScore', 'awayStarterId', 'homeStarterId', 'awayLineup', 'homeLineup', 'stadiumId', 'dayGameFlag', 'weather', 'temperature', 'statcastFlag']]
 

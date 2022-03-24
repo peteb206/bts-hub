@@ -241,7 +241,7 @@ class BTSHubMongoDB:
                 r = session.get(f'https://baseballsavant.mlb.com/leaderboard/statcast-park-factors?type=venue&batSide={right_left}&stat=index_Hits&condition={day_night}&rolling=no')
                 r.html.render(sleep=10, timeout=10)
                 soup = BeautifulSoup(r.html.html, 'html.parser')
-                table = soup.find('table')
+                table = soup.find_all('table')[-1]
                 thead, tbody = table.find('thead'), table.find('tbody')
                 column_headers = [column_header.text for column_header in thead.find_all('th')]
                 for trow in tbody.find_all('tr'):

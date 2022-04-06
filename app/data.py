@@ -349,6 +349,9 @@ class BTSHubMongoDB:
 
         # Read csvs
         df = pd.concat([self.__read_statcast_csv(month=month) for month in range(4, 10)])
+        column_names = ['gamePk', 'gameDateTimeUTC', 'atBatNumber', 'inning', 'inningBottomFlag', 'batterId', 'rightHandedBatterFlag', 'pitcherId', 'rightHandedPitcherFlag', 'xBA', 'eventTypeId']
+        if len(df.index) == 0:
+            return pd.DataFrame([], columns=column_names)
 
         # Calculated columns
         df['inningBottomFlag'] = df['inning_topbot'] == 'Bot'
@@ -363,7 +366,7 @@ class BTSHubMongoDB:
         # Clean up dataframe
         df.rename({'game_pk': 'gamePk', 'at_bat_number': 'atBatNumber', 'batter': 'batterId', 'pitcher': 'pitcherId', 'estimated_ba_using_speedangle': 'xBA'}, inplace=True, axis=1)
         df.sort_values(['gamePk', 'gameDateTimeUTC', 'inning', 'atBatNumber'], ignore_index=True, inplace=True)
-        return df[['gamePk', 'gameDateTimeUTC', 'atBatNumber', 'inning', 'inningBottomFlag', 'batterId', 'rightHandedBatterFlag', 'pitcherId', 'rightHandedPitcherFlag', 'xBA', 'eventTypeId']]
+        return df[column_names]
 
 
     def __read_statcast_csv(self, month=4):
@@ -1315,7 +1318,12 @@ class BTSHubMongoDB:
     def dashboard_games(self, date=None):
         return self.get_db()['games'].aggregate([
             {
-                '$match': {'gameDateTimeUTC': {'$gte': date + timedelta(hours=5), '$lte': date + timedelta(hours=30)}}
+                '$match': {
+                    'gameDateTimeUTC': {
+                        '$gte': date + timedelta(hours=5),
+                        '$lte': date + timedelta(hours=30)
+                    }
+                }
             }, {
                 '$lookup': {
                     'from': 'teams',
@@ -1451,12 +1459,12 @@ class BTSHubMongoDB:
             }, {
                 '$unwind': {
                     'path': '$awayStarter',
-                    'preserveNullAndEmptyArrays': True
+                    # 'preserveNullAndEmptyArrays': True
                 }
             }, {
                 '$unwind': {
                     'path': '$homeStarter',
-                    'preserveNullAndEmptyArrays': True
+                    # 'preserveNullAndEmptyArrays': True
                 }
             }, {
                 '$sort': {
@@ -1479,11 +1487,32 @@ class BTSHubMongoDB:
                             '$homeTeam.teamAbbreviation'
                         ]
                     },
-                    'awayStarter': '$awayStarter.playerName',
-                    'homeStarter': '$homeStarter.playerName',
-                    'weather': '$weather',
-                    'temperature': {
+                    'awayStarter': {
                         '$concat': [
+                            '<a href="javascript:void(0)" class="float-left" onclick="playerView(this, ',
+                            {
+                                '$toString': '$awayStarterId'
+                            },
+                            ', \'pitcher\')"><i class="fas fa-arrow-circle-right rowSelectorIcon"></i></a><span class="playerText">',
+                            '$awayStarter.playerName',
+                            '</span>'
+                        ]
+                    },
+                    'homeStarter': {
+                        '$concat': [
+                            '<a href="javascript:void(0)" class="float-left" onclick="playerView(this, ',
+                            {
+                                '$toString': '$homeStarterId'
+                            },
+                            ', \'pitcher\')"><i class="fas fa-arrow-circle-right rowSelectorIcon"></i></a><span class="playerText">',
+                            '$homeStarter.playerName',
+                            '</span>'
+                        ]
+                    },
+                    'weather': {
+                        '$concat': [
+                            '$weather',
+                            ' ',
                             '$temperature',
                             u'\N{DEGREE SIGN}'
                         ]
@@ -1493,32 +1522,88 @@ class BTSHubMongoDB:
         ])
 
 
-    def recent_batter_performances(self, date={}):
+    def eligible_batters(self, date=None):
         # TO DO: prepare data for input in logistic regression model
-        return self.get_db()['players'].aggregate([
+        today = date.strftime('%Y-%m-%d') == datetime.utcnow().strftime('%Y-%m-%d')
+        at_bats_agg_df = pd.DataFrame(list(self.get_db()['atBats'].aggregate([
             {
                 '$match': {
                     '$and': [
                         {
-                            'year': date.year
+                            '$expr': {
+                                '$eq': [
+                                    {
+                                        '$year': '$gameDateTimeUTC'
+                                    },
+                                    date.year
+                                ]
+                            }
                         }, {
-                            '$or': [
-                                {
-                                    'position': {
-                                        '$ne': 'P'
-                                    }
-                                }, {
-                                    'playerId': 660271
-                                }
-                            ]
+                            'gameDateTimeUTC': {
+                                '$lt': date
+                            }
                         }
                     ]
                 }
             }, {
                 '$lookup': {
-                    'from': 'teams',
+                    'from': 'eventTypes',
                     'let': {
-                        'teamId': '$teamId'
+                        'eventTypeId': '$eventTypeId'
+                    },
+                    'pipeline': [
+                        {
+                            '$match': {
+                                '$expr': {
+                                    '$eq': [
+                                        '$eventTypeId',
+                                        '$$eventTypeId'
+                                    ]
+                                }
+                            }
+                        }
+                    ],
+                    'as': 'event'
+                }
+            }, {
+                '$unwind': '$event'
+            }, {
+                '$group': {
+                    '_id': {
+                        'batter': '$batterId',
+                        'gamePk': '$gamePk',
+                        'gameDateTimeUTC': '$gameDateTimeUTC'
+                    },
+                    'xH': {
+                        '$sum': {
+                            '$cond': [
+                                {
+                                    '$gte': [
+                                        '$xBA',
+                                        0
+                                    ]
+                                },
+                                '$xBA',
+                                0
+                            ]
+                        }
+                    },
+                    'H': {
+                        '$sum': {
+                            '$cond': [
+                                '$event.hitFlag',
+                                1,
+                                0
+                            ]
+                        }
+                    }
+                }
+            }, {
+                '$lookup': {
+                    'from': 'games',
+                    'let': {
+                        'gamePk': '$_id.gamePk',
+                        'gameDateTimeUTC': '$_id.gameDateTimeUTC'
                     },
                     'pipeline': [
                         {
@@ -1527,13 +1612,13 @@ class BTSHubMongoDB:
                                     '$and': [
                                         {
                                             '$eq': [
-                                                '$teamId',
-                                                '$$teamId'
+                                                '$gamePk',
+                                                '$$gamePk'
                                             ]
                                         }, {
                                             '$eq': [
-                                                '$year',
-                                                date.year
+                                                '$gameDateTimeUTC',
+                                                '$$gameDateTimeUTC'
                                             ]
                                         }
                                     ]
@@ -1541,18 +1626,257 @@ class BTSHubMongoDB:
                             }
                         }
                     ],
-                    'as': 'team'
+                    'as': 'game'
                 }
             }, {
-                '$unwind': '$team'
+                '$unwind': '$game'
             }, {
                 '$project': {
                     '_id': 0,
-                    'name': '$playerName',
-                    'team': '$team.teamAbbreviation'
+                    'batter': '$_id.batter',
+                    'statcastG': {
+                        '$cond': [
+                            '$game.statcastFlag',
+                            1,
+                            0
+                        ]
+                    },
+                    'xH': '$xH',
+                    'xHG': {
+                        '$cond': [
+                            {
+                                '$gte': [
+                                    '$xH',
+                                    1
+                                ]
+                            },
+                            1,
+                            0
+                        ]
+                    },
+                    'H': '$H',
+                    'HG': {
+                        '$cond': [
+                            {
+                                '$gte': [
+                                    '$H',
+                                    1
+                                ]
+                            },
+                            1,
+                            0
+                        ]
+                    },
+                    'lineupSpot': {
+                        '$add': [
+                            {
+                                '$max': [
+                                    {
+                                        '$indexOfArray': [
+                                            '$game.awayLineup',
+                                            '$_id.batter'
+                                        ]
+                                    }, {
+                                        '$indexOfArray': [
+                                            '$game.homeLineup',
+                                            '$_id.batter'
+                                        ]
+                                    }
+                                ]
+                            },
+                            1
+                        ]
+                    }
+                }
+            }, {
+                '$group': {
+                    '_id': {
+                        'batter': '$batter'
+                    },
+                    'G': {
+                        '$sum': 1
+                    },
+                    'statcastG': {
+                        '$sum': '$statcastG'
+                    },
+                    'H': {
+                        '$sum': '$H'
+                    },
+                    'HG': {
+                        '$sum': '$HG'
+                    },
+                    'xH': {
+                        '$sum': '$xH'
+                    },
+                    'xHG': {
+                        '$sum': '$xHG'
+                    },
+                    'avgLineupSpot': {
+                        '$avg': {
+                            '$cond': [
+                                {
+                                    '$gt': [
+                                        '$lineupSpot',
+                                        0
+                                    ]
+                                },
+                                '$lineupSpot',
+                                None
+                            ]
+                        }
+                    }
+                }
+            }, {
+                '$lookup': {
+                    'from': 'players',
+                    'let': {
+                        'batter': '$_id.batter'
+                    },
+                    'pipeline': [
+                        {
+                            '$match': {
+                                '$expr': {
+                                    '$and': [
+                                        {
+                                            '$eq': [
+                                                '$playerId',
+                                                '$$batter'
+                                            ]
+                                        }, {
+                                            '$eq': [
+                                                '$year',
+                                                date.year
+                                            ]
+                                        }, {
+                                            '$or': [
+                                                {
+                                                    '$ne': [
+                                                        '$position',
+                                                        'P'
+                                                    ]
+                                                }, {
+                                                    '$eq': [
+                                                        '$playerId',
+                                                        660271 # Ohtani
+                                                    ]
+                                                }
+                                            ]
+                                        }, {
+                                            '$ne': [
+                                                'injuredFlag',
+                                                True if today else None # healthy
+                                            ]
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    ],
+                    'as': 'batter'
+                }
+            }, {
+                '$unwind': '$batter'
+            }, {
+                '$sort': {
+                    'xH': -1
+                }
+            }, {
+                '$project': {
+                    '_id': 0,
+                    'name': {
+                        '$concat': [
+                            '<a href="javascript:void(0)" class="float-left" onclick="playerView(this, ',
+                            {
+                                '$toString': '$batter.playerId'
+                            },
+                            ', \'batter\')"><i class="fas fa-arrow-circle-right rowSelectorIcon"></i></a><span class="playerText">',
+                            '$batter.playerName',
+                            '</span>'
+                        ]
+                    },
+                    'avgLineupSpot': {
+                        '$cond': [
+                            {
+                                '$eq': [
+                                    '$avgLineupSpot',
+                                    None
+                                ]
+                            },
+                            '',
+                            {
+                                '$toString': {
+                                    '$round': [
+                                        '$avgLineupSpot',
+                                        1
+                                    ]
+                                }
+                            }
+                        ]
+                    },
+                    'G': '$G',
+                    'H %': {
+                        '$concat': [
+                            {
+                                '$toString': {
+                                    '$round': [
+                                        {
+                                            '$multiply': [
+                                                {
+                                                    '$divide': [
+                                                        '$HG',
+                                                        '$G'
+                                                    ]
+                                                },
+                                                100
+                                            ]
+                                        },
+                                        1
+                                    ]
+                                }
+                            },
+                            ' %'
+                        ]
+                    },
+                    'xH %': {
+                        '$concat': [
+                            {
+                                '$toString': {
+                                    '$round': [
+                                        {
+                                            '$multiply': [
+                                                {
+                                                    '$divide': [
+                                                        '$xHG',
+                                                        '$statcastG'
+                                                    ]
+                                                },
+                                                100
+                                            ]
+                                        },
+                                        1
+                                    ]
+                                }
+                            },
+                            ' %'
+                        ]
+                    },
+                    'xH / G': {
+                        '$toString': {
+                            '$round': [
+                                {
+                                    '$divide': [
+                                        '$xH',
+                                        '$G'
+                                    ]
+                                },
+                                2
+                            ]
+                        }
+                    }
                 }
             }
-        ])
+        ])))
+        return at_bats_agg_df
 
 
     def batter_span(self, where_dict={}):

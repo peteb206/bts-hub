@@ -18,6 +18,15 @@ div.scrollingCell {
     max-height: 6em;
     overflow: auto;
 }
+.float-left {
+    float: left;
+}
+span.tableTitle {
+    float: left;
+    color: var(--main-color);
+    font-size: 1.5rem;
+    padding-right: 10px;
+}
 #sidebarImage {
     position: absolute;
     left: 0px;
@@ -37,6 +46,10 @@ div.scrollingCell {
 .belowFilter {
     position: relative;
     top: 75px;
+    font-size: var(--content-font-size);
+}
+input.datepicker {
+    width: 200px
 }
 .datePickerLabel {
     padding-right: 5px;
@@ -71,9 +84,6 @@ div.scrollingCell {
 }
 .spinner-grow {
     margin-bottom: 10px;
-}
-div#content, .refreshFilter {
-    font-size: var(--content-font-size);
 }
 #rightBody {
     position: relative;
@@ -115,6 +125,12 @@ div#content, .refreshFilter {
 }
 .buttonText {
     margin-left: 10px;
+}
+span.playerText {
+    margin-left: 5px;
+}
+svg.fa-arrow-circle-down {
+    color: red;
 }
 a, a:hover, a:focus {
     color: inherit;
@@ -163,12 +179,7 @@ a, a:hover, a:focus {
     height: 5rem;
     animation-duration: 1s;
 }
-#updateFiltersButtonInactive {
-    background: white;
-    color: #E8E8E8;
-    line-height: 1;
-}
-#updateFiltersButtonActive {
+#updateFiltersButton {
     background: var(--main-color);
     color: var(--secondary-color);
     line-height: 1;

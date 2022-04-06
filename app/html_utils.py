@@ -1,7 +1,3 @@
-try:
-    import app.utils as utils
-except ModuleNotFoundError:
-    import utils
 import pandas as pd
 import re
 from datetime import datetime, timedelta
@@ -16,9 +12,9 @@ def sidebar_links_html(db, current_endpoint, collapse_sidebar):
         ['Dashboard', 'fas fa-home', '/dashboard'],
         # ['My Picks', 'fas fa-pencil-alt', '/picks'],
         # ['Leaderboard', 'fas fa-list-ol', '/leaderboard'],
-        ['Splits', 'fas fa-coins' , '/splits'],
-        ['Simulations', 'fas fa-chart-bar', '/simulations'],
-        ['Data', 'fas fa-database', '/dataView'],
+        # ['Splits', 'fas fa-coins' , '/splits'],
+        # ['Simulations', 'fas fa-chart-bar', '/simulations'],
+        # ['Data', 'fas fa-database', '/dataView'],
         ['Games', 'fas fa-calendar-alt', f'/games?startDate={game_dates[0]}&endDate={game_dates[-1]}'],
         ['At Bats', 'fas fa-baseball-ball', f'/atBats?startDate={available_dates[-7]}&endDate={available_dates[-1]}'],
         ['Players', 'fas fa-users', f'/players?year={year}'],
@@ -33,17 +29,19 @@ def sidebar_links_html(db, current_endpoint, collapse_sidebar):
         partial_sidebar_hidden = ' hidden'
     for list_item in list_items:
         active = current_endpoint == list_item[2].split('?')[0]
-        list_items_html += '<li title="' + list_item[0] + '"' + ' class="' + ('active' if active else 'inactive') + '">'
-        list_items_html +=    '<a href="' + ('#' if active else list_item[2]) + '">'
-        list_items_html +=       '<div class="fullSidebarTab' + full_sidebar_hidden + '">'
-        list_items_html +=          '<i class="' + list_item[1] + '"></i>'
-        list_items_html +=          '<span class="buttonText">' + list_item[0] + '</span>'
-        list_items_html +=       '</div>'
-        list_items_html +=       '<div class="container-fluid partialSidebarTab' + partial_sidebar_hidden + '">'
-        list_items_html +=          '<i class="' + list_item[1] + ' fa-lg"></i>'
-        list_items_html +=       '</div>'
-        list_items_html +=    '</a>'
-        list_items_html += '</li>'
+        list_items_html += f'''
+            <li title="{list_item[0]}" class="{'active' if active else 'inactive'}">
+                <a href="{'#' if active else list_item[2]}">
+                    <div class="fullSidebarTab{full_sidebar_hidden}">
+                        <i class="{list_item[1]}"></i>
+                        <span class="buttonText">{list_item[0]}</span>
+                    </div>
+                    <div class="container-fluid partialSidebarTab{partial_sidebar_hidden}">
+                        <i class="{list_item[1]} fa-lg"></i>
+                    </div>
+                </a>
+            </li>
+        '''
     return list_items_html
 
 
@@ -51,48 +49,51 @@ def filters_html(filter_types, filter_values):
     filter_html = ''
     if 'date' in filter_types:
         date_value = filter_values.strftime('%a, %B %-d, %Y')
-        filter_html += '<div class="col-auto">'
-        filter_html +=    '<span class="datePickerLabel">Date:</span>'
-        filter_html +=   f'<input placeholder="None selected..." type="text" id="date" class="datepicker" value="{date_value}" readonly>'
-        filter_html += '</div>'
+        filter_html = f'''
+            <div class="col-auto">
+                <span class="datePickerLabel">Date:</span>
+                <input placeholder="None selected..." type="text" id="date" class="datepicker" value="{date_value}" readonly>
+            </div>
+        '''
     elif 'date_range' in filter_types:
         date_value = [filter_value.strftime('%a, %B %-d, %Y') if filter_value else '' for filter_value in filter_values]
-        filter_html += '<div class="col-auto">'
-        filter_html +=    '<span class="datePickerLabel">Start Date:</span>'
-        filter_html +=   f'<input placeholder="None selected..." type="text" id="startDate" class="datepicker" value="{date_value[0]}" readonly>'
-        filter_html += '</div>'
-        filter_html += '<div class="col-auto">'
-        filter_html +=    '<span class="datePickerLabel">End Date:</span>'
-        filter_html +=   f'<input placeholder="None selected..." type="text" id="endDate" class="datepicker" value="{date_value[1]}" readonly>'
-        filter_html += '</div>'
+        filter_html = f'''
+            <div class="col-auto">
+                <span class="datePickerLabel">Start Date:</span>
+                <input placeholder="None selected..." type="text" id="startDate" class="datepicker" value="{date_value[0]}" readonly>
+            </div>
+            <div class="col-auto">
+                <span class="datePickerLabel">End Date:</span>
+                <input placeholder="None selected..." type="text" id="endDate" class="datepicker" value="{date_value[1]}" readonly>
+            </div>
+        '''
     elif 'year' in filter_types:
-        filter_html += '<div class="col-auto">'
-        filter_html +=    '<span class="datePickerLabel">Year:</span>'
-        filter_html +=    '<select id="yearPicker" onchange="addClass($(\'#updateFiltersButtonInactive\'), \'hidden\'); removeClass($(\'#updateFiltersButtonActive\'), \'hidden\');">'
-        for year in range(2015, 2023):
-            selected_year = ' selected="selected"' if year == filter_values else ''
-            filter_html +=    f'<option value="{year}"{selected_year}>{year}</option>'
-        filter_html +=    '</select>'
-        filter_html += '</div>'
+        filter_html = f'''
+            <div class="col-auto">
+                <span class="datePickerLabel">Year:</span>
+                <select id="yearPicker" onchange="$('#updateFiltersButton').prop('disabled', false);">
+                    {''.join([f'<option value="{year}"' + (' selected="selected"' if year == filter_values else '') + f'>{year}</option>' for year in range(2015, 2023)])}
+                </select>
+            </div>
+        '''
     if filter_html != '':
-        filter_html += '<div class="col-auto">'
-        filter_html +=    '<button type="button" id="updateFiltersButtonInactive" class="btn btn-secondary">'
-        filter_html +=       '<i class="fas fa-sync"></i>'
-        filter_html +=       '<span class="buttonText refreshFilter">Go</span>'
-        filter_html +=    '</button>'
-        filter_html +=    '<button type="button" id="updateFiltersButtonActive" class="btn btn-secondary hidden">'
-        filter_html +=       '<i class="fas fa-sync"></i>'
-        filter_html +=       '<span class="buttonText refreshFilter">Go</span>'
-        filter_html +=    '</button>'
-        filter_html += '</div>'
+        filter_html += '''
+            <div class="col-auto">
+                <button type="button" id="updateFiltersButton" class="btn btn-secondary" disabled>
+                    <i class="fas fa-sync"></i>
+                    <span class="buttonText refreshFilter">Go</span>
+                </button>
+            </div>
+        '''
     return filter_html
 
 
-def html_table(table_id, data):
+def html_table(table_id, data, title=None):
     assert isinstance(data, (list, pymongo.command_cursor.CommandCursor, pd.DataFrame))
+    title = f'<caption>{title}</caption>' if title else ''
     if isinstance(data, pd.DataFrame):
         data.columns = convert_camel_case_columns(data.columns)
-        return data.to_html(na_rep='', table_id=table_id, classes='display nowrap', border=0, justify='unset', index=False)
+        return data.to_html(na_rep='', table_id=table_id, classes='display nowrap', border=0, justify='unset', index=False).replace('<thead', f'{title}<thead')
     else:
         tbody, column_list = '', list()
         for document in data:
@@ -102,7 +103,7 @@ def html_table(table_id, data):
         if len(column_list) == 0:
             column_list = [' ']
         thead = ''.join([f'<th>{column}</th>' for column in convert_camel_case_columns(column_list)])
-        return f'<table id="{table_id}" class="display nowrap"><thead>{thead}</thead><tbody>{tbody}</tbody></table>'
+        return f'<table id="{table_id}" class="display nowrap">{title}<thead>{thead}</thead><tbody>{tbody}</tbody></table>'
 
 
 def convert_camel_case_columns(column_list):
@@ -126,16 +127,32 @@ def display_html(db, path, filters={}):
     html = ''
     if path == 'dashboard':
         date = filters['date']
-        html =  '<div class="row">'
-        html +=    '<div class="col-6">'
-        html +=       '<h4>Recent Performance</h4>'
-        html +=       html_table('recentPerformances', db.recent_batter_performances(date=date))
-        html +=    '</div>'
-        html +=    '<div class="col-6">'
-        html +=       "<h4>Today's Games</h4>"
-        html +=       html_table('todaysGames', db.dashboard_games(date=date))
-        html +=    '</div>'
-        html += '</div>'
+        html =  f'''
+            <div id="dashboardTablesRow" class="row">
+                <div class="col">
+                    <div class="row">
+                        {html_table('eligibleBatters', db.eligible_batters(date=date), title='Eligible Batters')}
+                    </div>
+                    <div id="playerImageAndNameRow" class="row" style="padding-top: 10px;">
+                        <div class="col" style="max-width: 125px;">
+                            <img id="playerImage" style="width: 125px; height: auto;" src="https://securea.mlb.com/mlb/images/players/head_shot/generic.jpg"/>
+                        </div>
+                        <div id="keyStats" class="col">
+                            <h4 id="playerName" class="text-center"></h4>
+                        </div>
+                    </div>
+                </div>
+                <div class="col">
+                    <div class="row">
+                        {html_table('todaysGames', db.dashboard_games(date=date), title="Today's Games")}
+                    </div>
+                </div>
+            </div>
+            <div class="row">
+                <div id="playerGameLogs" class="col">
+                </div>
+            </div>
+        '''
     elif path == 'games':
         html = html_table('dataView', db.game_span(where_dict=filters))
     elif path == 'atBats':

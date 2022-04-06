@@ -18,8 +18,7 @@ $('.datepicker').datepicker({
     dateFormat: 'D, MM d, yy',
     onSelect: function(date, datePicker) {
         if (date !== datePicker.lastVal) {
-            addClass($('#updateFiltersButtonInactive'), 'hidden');
-            removeClass($('#updateFiltersButtonActive'), 'hidden');
+            $('#updateFiltersButton').prop('disabled', false);
         }
     },
     beforeShowDay: function(date) {
@@ -32,7 +31,7 @@ $('.datepicker').datepicker({
     }
 });
 
-$('#updateFiltersButtonActive').on('click', function() {
+$('#updateFiltersButton').on('click', function() {
     var filters = [];
     ['date', 'startDate', 'endDate', 'year'].forEach(function(datePickerId) {
         if (datePickerId === 'year') {

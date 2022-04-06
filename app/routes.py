@@ -2,6 +2,7 @@ import os
 from app import app, db
 from flask import jsonify, render_template, request, redirect, send_from_directory
 from datetime import datetime, timedelta
+import pandas as pd
 import app.utils as utils
 import app.html_utils as html_utils
 
@@ -18,21 +19,176 @@ def base():
     return redirect('/dashboard')
 
 
-@app.route('/batterView/<player_id>', methods=['GET'])
-@app.route('/pitcherView/<player_id>', methods=['GET'])
+@app.route('/playerDetails/<player_id>', methods=['GET'])
 def player_view(player_id):
     query_parameters_dict = utils.parse_request_arguments(request.args)
     date = datetime.strptime(query_parameters_dict['date'], '%Y-%m-%d')
 
-    batter, recent_games = request.path.startswith('/batter'), list()
-    if batter:
+    player_data_dict = list(db.get_db()['players'].aggregate([
+        {
+            '$match': {
+                'playerId': int(player_id),
+                'year': date.year
+            }
+        }, {
+            '$lookup': {
+                'from': 'teams',
+                'let': {
+                    'teamId': '$teamId'
+                },
+                'pipeline': [
+                    {
+                        '$match': {
+                            '$expr': {
+                                '$and': [
+                                    {
+                                        '$eq': [
+                                            '$teamId',
+                                            '$$teamId'
+                                        ]
+                                    }, {
+                                        '$eq': [
+                                            '$year',
+                                            date.year
+                                        ]
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                ],
+                'as': 'team'
+            }
+        }, {
+            '$unwind': '$team'
+        }, {
+            '$project': {
+                '_id': 0,
+                'name': '$playerName',
+                'team': '$team.teamAbbreviation',
+                'position': '$position',
+                'bats': '$bats',
+                'throws': '$throws',
+                'injured': '$injuredFlag'
+            }
+        }
+    ]))
+    return jsonify({'data': player_data_dict[0]})
+
+
+@app.route('/summaryStats/<stat_type>/<player_id>', methods=['GET'])
+def player_stats(stat_type, player_id):
+    query_parameters_dict = utils.parse_request_arguments(request.args)
+    date = datetime.strptime(query_parameters_dict['date'], '%Y-%m-%d')
+    summary_stats = dict()
+
+    if stat_type == 'batter':
+        at_bat_details_df = pd.DataFrame(list(db.get_db()['atBats'].aggregate([
+            {
+                '$match': {
+                    'batterId': int(player_id),
+                    'gameDateTimeUTC': {
+                        '$gte': datetime(date.year, 1, 1),
+                        '$lte': date + timedelta(hours=5)
+                    }
+                }
+            }, {
+                '$lookup': {
+                    'from': 'eventTypes',
+                    'let': {
+                        'eventTypeId': '$eventTypeId'
+                    },
+                    'pipeline': [
+                        {
+                            '$match': {
+                                '$expr': {
+                                    '$eq': [
+                                        '$eventTypeId',
+                                        '$$eventTypeId'
+                                    ]
+                                }
+                            }
+                        }
+                    ],
+                    'as': 'event'
+                }
+            }, {
+                '$unwind': '$event'
+            }, {
+                '$lookup': {
+                    'from': 'games',
+                    'let': {
+                        'gamePk': '$gamePk',
+                        'gameDateTimeUTC': '$gameDateTimeUTC'
+                    },
+                    'pipeline': [
+                        {
+                            '$match': {
+                                '$expr': {
+                                    '$and': [
+                                        {
+                                            '$eq': [
+                                                '$gamePk',
+                                                '$$gamePk'
+                                            ]
+                                        }, {
+                                            '$eq': [
+                                                '$gameDateTimeUTC',
+                                                '$$gameDateTimeUTC'
+                                            ]
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    ],
+                    'as': 'game'
+                }
+            }, {
+                '$unwind': '$game'
+            }, {
+                '$project': {
+                    '_id': 0,
+                    'gamePk': '$gamePk',
+                    'gameDateTimeUTC': '$gameDateTimeUTC',
+                    'rightHandedBatterFlag': '$rightHandedBatterFlag',
+                    'rightHandedPitcherFlag': '$rightHandedPitcherFlag',
+                    'inningBottomFlag': '$inningBottomFlag',
+                    'hits': {
+                        '$cond': [
+                            '$event.hitFlag',
+                            1,
+                            0
+                        ]
+                    },
+                    'balls_in_play': {
+                        '$cond': [
+                            '$event.inPlayFlag',
+                            1,
+                            0
+                        ]
+                    },
+                    'statcast': '$game.statcastFlag'
+                }
+            }
+        ])))
+        print(at_bat_details_df.head())
+    return jsonify({'data': summary_stats})
+
+
+@app.route('/gameLogs/<stat_type>/<player_id>', methods=['GET'])
+def game_logs(stat_type, player_id):
+    query_parameters_dict = utils.parse_request_arguments(request.args)
+    date, recent_games = datetime.strptime(query_parameters_dict['date'], '%Y-%m-%d'), list()
+
+    if stat_type == 'batter':
         recent_games = list(db.get_db()['atBats'].aggregate([
             {
                 '$match': {
                     'batterId': int(player_id),
                     'gameDateTimeUTC': {
                         '$gte': datetime(date.year, 1, 1),
-                        '$lte': date
+                        '$lte': date + timedelta(hours=5)
                     }
                 }
             }, {
@@ -101,9 +257,37 @@ def player_view(player_id):
                     }
                 }
             }, {
-                '$sort': {
-                    '_id.gameDateTimeUTC': -1
+                '$lookup': {
+                    'from': 'games',
+                    'let': {
+                        'gamePk': '$_id.gamePk',
+                        'gameDateTimeUTC': '$_id.gameDateTimeUTC'
+                    },
+                    'pipeline': [
+                        {
+                            '$match': {
+                                '$expr': {
+                                    '$and': [
+                                        {
+                                            '$eq': [
+                                                '$gamePk',
+                                                '$$gamePk'
+                                            ]
+                                        }, {
+                                            '$eq': [
+                                                '$gameDateTimeUTC',
+                                                '$$gameDateTimeUTC'
+                                            ]
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    ],
+                    'as': 'game'
                 }
+            }, {
+                '$unwind': '$game'
             }, {
                 '$project': {
                     '_id': 0,
@@ -122,17 +306,143 @@ def player_view(player_id):
                             3
                         ]
                     },
-                    'h': '$H'
+                    'h': '$H',
+                    'order': {
+                        '$add': [
+                            {
+                                '$max': [
+                                    {
+                                        '$indexOfArray': [
+                                            '$game.awayLineup',
+                                            '$_id.batter'
+                                        ]
+                                    }, {
+                                        '$indexOfArray': [
+                                            '$game.homeLineup',
+                                            '$_id.batter'
+                                        ]
+                                    }
+                                ]
+                            },
+                            1
+                        ]
+                    }
                 }
             }
         ]))
-
-    player_data = db.read_collection_as_list('players', where_dict={'playerId': int(player_id), 'year': date.year})[0]
-    player_data_dict = {
-        'name': player_data['playerName'],
-        'recentGames': recent_games
-    }
-    return jsonify({'data': player_data_dict})
+    elif stat_type == 'pitcher':
+        recent_games = list(db.get_db()['atBats'].aggregate([
+            {
+                '$match': {
+                    'pitcherId': int(player_id),
+                    'gameDateTimeUTC': {
+                        '$gte': datetime(date.year, 1, 1),
+                        '$lte': date
+                    }
+                }
+            }, {
+                '$lookup': {
+                    'from': 'eventTypes',
+                    'let': {
+                        'eventTypeId': '$eventTypeId'
+                    },
+                    'pipeline': [
+                        {
+                            '$match': {
+                                '$expr': {
+                                    '$eq': [
+                                        '$eventTypeId',
+                                        '$$eventTypeId'
+                                    ]
+                                }
+                            }
+                        }
+                    ],
+                    'as': 'event'
+                }
+            }, {
+                '$unwind': '$event'
+            }, {
+                '$group': {
+                    '_id': {
+                        'pitcher': '$pitcherId',
+                        'gamePk': '$gamePk',
+                        'gameDateTimeUTC': '$gameDateTimeUTC'
+                    },
+                    'BF': {
+                        '$sum': 1
+                    },
+                    'xH': {
+                        '$sum': {
+                            '$cond': [
+                                {
+                                    '$gte': [
+                                        '$xBA',
+                                        0
+                                    ]
+                                },
+                                '$xBA',
+                                0
+                            ]
+                        }
+                    },
+                    'H': {
+                        '$sum': {
+                            '$cond': [
+                                '$event.hitFlag',
+                                1,
+                                0
+                            ]
+                        }
+                    },
+                    'BIP': {
+                        '$sum': {
+                            '$cond': [
+                                '$event.inPlayFlag',
+                                1,
+                                0
+                            ]
+                        }
+                    }
+                }
+            }, {
+                '$project': {
+                    '_id': 0,
+                    'date': {
+                        '$dateToString': {
+                            'format': '%Y-%m-%d',
+                            'date': '$_id.gameDateTimeUTC',
+                            'timezone': '-05:00'
+                        }
+                    },
+                    'bf': '$BF',
+                    'bip': '$BIP',
+                    'xH': {
+                        '$round': [
+                            {
+                                '$divide': [
+                                    '$xH',
+                                    '$BF'
+                                ]
+                            },
+                            3
+                        ]
+                    },
+                    'h': {
+                        '$round': [
+                            {
+                                '$divide': [
+                                    '$H',
+                                    '$BF'
+                                ]
+                            },
+                            3
+                        ]
+                    }
+                }
+            }
+        ]))
+    return jsonify({'data': recent_games})
 
 
 @app.route('/<path>', methods=['GET'])

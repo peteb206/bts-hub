@@ -16,20 +16,10 @@ $(window).on('load', function () {
                     searching: true,
                     info: true,
                     order: [],
-                    rowCallback: function(row) {
-                        $('td', row).each(function() {
-                            var cellText = $(this).text();
-                            if (cellText.startsWith('<') && cellText.endsWith('>'))
-                                $(this).html(cellText);
-                        });
-                    }
+                    rowCallback: dataTablesRowCallback
                 }
                 var thisTableId = thisTable.attr('id');
-                if (thisTableId == 'todaysGames') {
-                    tableSettings.paging = false;
-                    tableSettings.searching = false;
-                    tableSettings.info = false;
-                } else if (thisTableId == 'eligibleBatters') {
+                if (thisTableId == 'eligibleBatters') {
                     tableSettings.lengthChange = false;
                     tableSettings.info = false;
                 }
@@ -38,12 +28,10 @@ $(window).on('load', function () {
                 thisTable.find('caption').each(function() {
                     var captionText = $(this).text();
                     $(this).remove();
-                    var tableTitle = $('<span>')
-                        .attr('class', 'tableTitle')
-                        .text(captionText);
-                    thisTable.parent().prepend(tableTitle);
+                    addTableTitle(thisTable, captionText);
                 });
             });
+            loadDashboard();
             let script = document.createElement('script');
             script.src = '/static/js/filters.js';
             document.head.appendChild(script);

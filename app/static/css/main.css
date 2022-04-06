@@ -59,6 +59,25 @@ input.datepicker {
     /* background-color: var(--secondary-color); */
     background: transparent;
 }
+.weatherIcon {
+    background: transparent;
+    margin-right: 5px;
+}
+span[title="Clear"] {
+    color: rgba(0, 132, 255, 0.407);
+}
+span[title="Sunny"] {
+    color: orange;
+}
+span[title="Partly Cloudy"] {
+    color: rgb(175, 194, 211);
+}
+span[title="Cloudy"] {
+    color: rgba(128, 128, 128, 0.681);
+}
+span[title="Roof Closed"] {
+    color: var(--main-color);
+}
 .injuredIcon {
     color: red;
 }
@@ -129,8 +148,11 @@ input.datepicker {
 span.playerText {
     margin-left: 5px;
 }
-svg.fa-arrow-circle-down {
-    color: red;
+i.fa-arrow-circle-right {
+    color: var(--secondary-color);
+}
+i.fa-arrow-circle-down {
+    color: var(--main-color);
 }
 a, a:hover, a:focus {
     color: inherit;

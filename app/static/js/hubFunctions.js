@@ -1,4 +1,4 @@
-let parseCookie = function(cookieToReturn) {
+let parseCookie = function (cookieToReturn) {
     var cookieObj = {
         'collapseSidebar': 'true'
     };
@@ -12,60 +12,7 @@ let parseCookie = function(cookieToReturn) {
     return cookieObj[cookieToReturn];
 }
 
-let buildDataTable = function(args) {
-    let collection = args.dataSource.split('/').pop();
-    $.ajax({
-        type: 'GET',
-        url: '/columns/' + collection,
-        dataType: 'json',
-        success : function(columnData) {
-            let columnArray = columnData.data[0].columns; 
-            var columns = [];
-            for (var i = 0; i < columnArray.length; i++) {
-                var column = columnArray[i];
-                columns.push({
-                    data: column,
-                    title: column.charAt(0).toUpperCase() + column.slice(1).replace(/([a-z])([A-Z])/g, '$1 $2')
-                });
-            }
-            var config = {
-                ajax: args.dataSource,
-                columns: columns,
-                destroy: true,
-                pagingType: 'full',
-                columnDefs: [
-                    {
-                        targets: '_all',
-                        defaultContent: ''
-                    }
-                ]
-                // dom: 'Bfrtip'
-            }
-            if (args.buttons) {
-                config.buttons = buttons;
-            }
-            if (args.sortMap) {
-                let sortMap = args.sortMap;
-                config.order = [];
-                Object.keys(sortMap).forEach(function(col) {
-                    config.order.push([col, sortMap[col]]);
-                });
-            }
-            if (args.initCompleteFunc) {
-                config.initComplete = initCompleteFunc;
-            }
-            if (args.rowCallbackFunc) {
-                config.rowCallback = rowCallbackFunc;
-            }
-            if (args.infoCallbackFunc) {
-                config.infoCallback = infoCallbackFunc;
-            }
-            args.tableElement.DataTable(config);
-        }
-    });
-}
-
-let formatDatePickerDate = function(date, format) {
+let formatDatePickerDate = function (date, format) {
     var dateString = '';
     if (format == 'yyyy-mm-dd') {
         year = date.getFullYear();
@@ -82,29 +29,107 @@ let formatDatePickerDate = function(date, format) {
     return dateString;
 }
 
-let adjustContentToSidebar = function() {
+let adjustContentToSidebar = function () {
     $('#rightBody').css('margin-left', $('#sidebar').css('max-width'));
 }
 
-let addClass = function(element, className) {
+let addClass = function (element, className) {
     if (!element.hasClass(className)) {
         element.addClass(className);
     }
 }
 
-let removeClass = function(element, className) {
+let removeClass = function (element, className) {
     if (element.hasClass(className)) {
         element.removeClass(className);
     }
 }
 
-let gameLogsColumns = function(playerType) {
+let getIcon = function (weather) {
+    var weatherKey = weather.toLowerCase();
+    var iconMap =  {
+        'clear': 'fa fa-sun',
+        'sunny': 'fas fa-sun',
+        'partly cloudy': 'fas fa-cloud-sun',
+        'cloudy': 'fas fa-cloud',
+        'overcast': 'fas fa-cloud',
+        'roof closed': 'fas fa-landmark-dome',
+        'dome': 'fas fa-landmark-dome'
+    }
+    var weatherIcon = weather;
+    if (iconMap[weatherKey]) {
+        weatherIcon = '<span title="' + weather + '"><i class="' + iconMap[weatherKey] + ' weatherIcon"></i></span>';
+    }
+    return weatherIcon;
+}
+
+let addTableTitle = function (table, title) {
+    var tableTitle = $('<span>')
+        .attr('class', 'tableTitle')
+        .text(title);
+    table.parent().prepend(tableTitle);
+}
+
+let dataTablesRowCallback = function (row) {
+    $('td', row).each(function () {
+        var cellText = $(this).text();
+        if (cellText.startsWith('<') && cellText.endsWith('>'))
+            $(this).html(cellText);
+    });
+}
+
+let loadDashboard = function () {
+    if ($('table#todaysGames').length) {
+        $.ajax({
+            type: 'GET',
+            url: 'https://statsapi.mlb.com/api/v1/schedule' + $(location).attr('search') + '&lang=en&sportId=1&hydrate=team,probablePitcher,weather',
+            dataType: 'json',
+            success: function (json) {
+                var gamesData = [];
+                var dates = json.dates;
+                if (dates.length) {
+                    var games = dates[0].games;
+                    for (var i = 0; i < games.length; i++) {
+                        var game = games[i];
+                        var gameDate = new Date(game.gameDate);
+                        var gameTime = [gameDate.getHours(), gameDate.getMinutes() < 10 ? '0' + gameDate.getMinutes() : gameDate.getMinutes()].join(':');
+                        gamesData.push([
+                            gameTime,
+                            game.teams.away.team.abbreviation + ' @ ' + game.teams.home.team.abbreviation,
+                            game.teams.away.probablePitcher ? '<a href="javascript:void(0)" class="float-left" onclick="playerView(this, ' + game.teams.away.probablePitcher.id + ', \'pitcher\')"><i class="fas fa-arrow-circle-right rowSelectorIcon"></i></a><span class="playerText">' + game.teams.away.probablePitcher.fullName + '</span>' : '',
+                            game.teams.home.probablePitcher ? '<a href="javascript:void(0)" class="float-left" onclick="playerView(this, ' + game.teams.home.probablePitcher.id + ', \'pitcher\')"><i class="fas fa-arrow-circle-right rowSelectorIcon"></i></a><span class="playerText">' + game.teams.home.probablePitcher.fullName + '</span>' : '',
+                            game.status.detailedState,
+                            (game.weather ? getIcon(game.weather.condition) : '') + '<span>' + game.weather.temp + ' &#186;F</span>'
+                        ]);
+                    }
+                }
+                var todaysGamesTable = $('table#todaysGames');
+                todaysGamesTable.DataTable({
+                    data: gamesData,
+                    paging: false,
+                    searching: false,
+                    info: false,
+                    rowCallback: dataTablesRowCallback
+                });
+                addTableTitle(todaysGamesTable, "Today's Games");
+            },
+            error: function () {
+                alert('Could not get game statuses.');
+            }
+        });
+    }
+}
+
+let gameLogsColumns = function (playerType) {
     var columns = [];
     if (playerType == 'batter') {
         columns = [
             {
                 data: 'date',
                 title: 'Date'
+            }, {
+                data: 'order',
+                title: 'Lineup Spot'
             }, {
                 data: 'pa',
                 title: 'PA'
@@ -132,10 +157,10 @@ let gameLogsColumns = function(playerType) {
                 title: 'BIP'
             }, {
                 data: 'xH',
-                title: 'xH'
+                title: 'xH / BF'
             }, {
                 data: 'h',
-                title: 'H'
+                title: 'H / BF'
             }
         ]
     }
@@ -143,42 +168,58 @@ let gameLogsColumns = function(playerType) {
 }
 
 let playerView = function (anchor, playerId, viewType) {
-    if ($(anchor).find('svg.fa-arrow-circle-right').length) {
-        $('svg.fa-arrow-circle-down').removeClass('fa-arrow-circle-down').addClass('fa-arrow-circle-right');
+    if ($(anchor).find('i.fa-arrow-circle-right').length) {
+        $('i.fa-arrow-circle-down').removeClass('fa-arrow-circle-down')
+            .addClass('fa-arrow-circle-right');
+        $('img#playerImage').attr('src', 'https://securea.mlb.com/mlb/images/players/head_shot/' + playerId + '.jpg');
+
+        // Player Info
         $.ajax({
             type: 'GET',
-            url: '/' + viewType + 'View/' + playerId + $(location).attr('search'),
+            url: '/playerDetails/' + playerId + $(location).attr('search'),
             dataType: 'json',
-            success: function(json) {
-                var data = json.data;
-                $('img#playerImage').attr('src', 'https://securea.mlb.com/mlb/images/players/head_shot/' + playerId +'.jpg');
-                $('div#keyStats').find('h4').text(data.name);
-
-                $('div#playerGameLogs').empty();
-                var gameLogsTable = $('<table></table>')
-                    .attr('id', 'gameLogsTable')
-                    .attr('class', 'display');
-                $('div#playerGameLogs').append(gameLogsTable);
-                gameLogsTable = $('table#gameLogsTable');
-                gameLogsTable.DataTable({
-                    data: data.recentGames,
-                    columns: gameLogsColumns(viewType),
-                    pageLength: 5,
-                    lengthChange: false,
-                    searching: false,
-                    info: false,
-                    order: []
+            success: function (json) {
+                var playerData = json.data;
+                Object.keys(playerData).forEach(function (attribute) {
+                    var attributeProperCase = attribute.charAt(0).toUpperCase() + attribute.substring(1);
+                    $('#player' + attributeProperCase).text((attributeProperCase == 'Name' ? '' : attributeProperCase + ': ') + playerData[attribute]);
                 });
-                var tableTitle = $('<span>')
-                    .attr('class', 'tableTitle')
-                    .text('Recent Games');
-                gameLogsTable.parent().prepend(tableTitle);
-
-                $(anchor).find('svg').removeClass('fa-arrow-circle-right').addClass('fa-arrow-circle-down');
-            },
-            error: function() {
-                alert('Could not load player view');
             }
         });
+
+        // Key Stats
+        $.ajax({
+            type: 'GET',
+            url: '/summaryStats/' + viewType + '/' + playerId + $(location).attr('search'),
+            dataType: 'json',
+            success: function (json) {
+
+            }
+        });
+
+        // Game Logs
+        $('div#playerGameLogs').empty();
+        var gameLogsTable = $('<table></table>')
+            .attr('id', 'gameLogsTable')
+            .attr('class', 'display');
+        $('div#playerGameLogs').append(gameLogsTable);
+        gameLogsTable = $('table#gameLogsTable');
+        gameLogsTable.DataTable({
+            ajax: '/gameLogs/' + viewType + '/' + playerId + $(location).attr('search'),
+            columns: gameLogsColumns(viewType),
+            pageLength: 5,
+            lengthChange: false,
+            searching: false,
+            info: false,
+            order: [[0, 'desc']]
+        });
+        var tableTitle = $('<span>')
+            .attr('class', 'tableTitle')
+            .text('Recent Games');
+        gameLogsTable.parent().prepend(tableTitle);
+
+        $(anchor).find('i')
+            .removeClass('fa-arrow-circle-right')
+            .addClass('fa-arrow-circle-down');
     }
 }

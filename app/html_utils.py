@@ -127,24 +127,51 @@ def display_html(db, path, filters={}):
     html = ''
     if path == 'dashboard':
         date = filters['date']
+        eligible_batters_df = pd.DataFrame(list(db.eligible_batters(date=date))) # merge this with analytics to provide prediction
+        eligible_batters_df['batter'] = eligible_batters_df.apply(lambda row: f'<a href="javascript:void(0)" class="float-left" onclick="playerView(this, {row["batter"]}, \'batter\')"><i class="fas fa-arrow-circle-right rowSelectorIcon"></i></a><span class="playerText">{row["name"]}</span>', axis=1)
         html =  f'''
             <div id="dashboardTablesRow" class="row">
-                <div class="col">
+                <div class="col-5">
                     <div class="row">
-                        {html_table('eligibleBatters', db.eligible_batters(date=date), title='Eligible Batters')}
+                        {html_table('eligibleBatters', eligible_batters_df[['batter', 'team', 'time', 'lineupSlot']], title='Eligible Batters')}
                     </div>
                     <div id="playerImageAndNameRow" class="row" style="padding-top: 10px;">
-                        <div class="col" style="max-width: 125px;">
-                            <img id="playerImage" style="width: 125px; height: auto;" src="https://securea.mlb.com/mlb/images/players/head_shot/generic.jpg"/>
+                        <div class="col" style="max-width: 125px; margin-right: 10px;">
+                            <img id="playerImage" style="width: 125px; height: auto;"/><!-- https://securea.mlb.com/mlb/images/players/head_shot/generic.jpg -->
                         </div>
-                        <div id="keyStats" class="col">
-                            <h4 id="playerName" class="text-center"></h4>
+                        <div id="playerInfo" class="col">
+                            <div class="row">
+                                <h4 id="playerName" class="text-center"></h4>
+                            </div>
+                            <div class="row" style="padding-top: 5px;">
+                                <span id="playerTeam"></span>
+                            </div>
+                            <div class="row" style="padding-top: 5px;">
+                                <span id="playerPosition"></span>
+                            </div>
+                            <div class="row" style="padding-top: 5px;">
+                                <span id="playerBats"></span>
+                            </div>
+                            <div class="row" style="padding-top: 5px;">
+                                <span id="playerThrows"></span>
+                            </div>
                         </div>
                     </div>
                 </div>
-                <div class="col">
+                <div class="col-7">
                     <div class="row">
-                        {html_table('todaysGames', db.dashboard_games(date=date), title="Today's Games")}
+                        <table id="todaysGames" class="nowrap">
+                            <thead>
+                                <tr>
+                                    <th>Time</th>
+                                    <th>Matchup</th>
+                                    <th>Away Starter</th>
+                                    <th>Home Starter</th>
+                                    <th>Status</th>
+                                    <th>Weather</th>
+                                </tr>
+                            </thead>
+                        </table>
                     </div>
                 </div>
             </div>

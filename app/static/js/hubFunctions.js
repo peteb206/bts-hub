@@ -53,8 +53,9 @@ let getIcon = function (weather) {
         'partly cloudy': 'fas fa-cloud-sun',
         'cloudy': 'fas fa-cloud',
         'overcast': 'fas fa-cloud',
-        'roof closed': 'fas fa-landmark-dome',
-        'dome': 'fas fa-landmark-dome'
+        'rain': 'fas fa-cloud-rain',
+        'roof closed': 'fas fa-people-roof',
+        'dome': 'fas fa-people-roof'
     }
     var weatherIcon = weather;
     if (iconMap[weatherKey]) {
@@ -98,7 +99,7 @@ let loadDashboard = function () {
                             game.teams.away.team.abbreviation + ' @ ' + game.teams.home.team.abbreviation,
                             game.teams.away.probablePitcher ? '<a href="javascript:void(0)" class="float-left" onclick="playerView(this, ' + game.teams.away.probablePitcher.id + ', \'pitcher\')"><i class="fas fa-arrow-circle-right rowSelectorIcon"></i></a><span class="playerText">' + game.teams.away.probablePitcher.fullName + '</span>' : '',
                             game.teams.home.probablePitcher ? '<a href="javascript:void(0)" class="float-left" onclick="playerView(this, ' + game.teams.home.probablePitcher.id + ', \'pitcher\')"><i class="fas fa-arrow-circle-right rowSelectorIcon"></i></a><span class="playerText">' + game.teams.home.probablePitcher.fullName + '</span>' : '',
-                            game.status.detailedState,
+                            game.status.detailedState + (game.teams.away.score !== undefined ? ' (' + game.teams.away.score + ' - ' + game.teams.home.score + ')' : ''),
                             (game.weather ? getIcon(game.weather.condition) : '') + '<span>' + game.weather.temp + ' &#186;F</span>'
                         ]);
                     }

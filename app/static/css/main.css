@@ -64,7 +64,7 @@ input.datepicker {
     margin-right: 5px;
 }
 span[title="Clear"] {
-    color: rgba(0, 132, 255, 0.407);
+    color: rgb(255, 209, 125);
 }
 span[title="Sunny"] {
     color: orange;
@@ -72,11 +72,14 @@ span[title="Sunny"] {
 span[title="Partly Cloudy"] {
     color: rgb(175, 194, 211);
 }
-span[title="Cloudy"] {
+span[title="Cloudy"], i.fa-circle-question {
     color: rgba(128, 128, 128, 0.681);
 }
 span[title="Roof Closed"] {
     color: var(--main-color);
+}
+span[title="Rain"] {
+    color: rgb(0, 136, 255);
 }
 .injuredIcon {
     color: red;

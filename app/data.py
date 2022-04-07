@@ -1411,7 +1411,6 @@ class BTSHubMongoDB:
                 '$unwind': '$team'
             }, {
                 '$project': {
-                    '_id': 0,
                     'batter': '$playerId',
                     'name': '$playerName',
                     'teamId': '$teamId',
@@ -1425,27 +1424,68 @@ class BTSHubMongoDB:
                             'timezone': '-05:00'
                         }
                     },
-                    'lineupSlot': {
-                        '$add': [
+                    'relevantLineup': {
+                        '$cond': [
                             {
-                                '$max': [
-                                    {
-                                        '$indexOfArray': [
-                                            '$games.awayLineup',
-                                            '$playerId'
-                                        ]
-                                    }, {
-                                        '$indexOfArray': [
-                                            '$games.homeLineup',
-                                            '$playerId'
-                                        ]
-                                    }
+                                '$eq': [
+                                    '$teamId',
+                                    '$games.awayTeamId'
                                 ]
                             },
-                            1
+                            '$games.awayLineup',
+                            '$games.homeLineup'
                         ]
                     }
                 }
+            }, {
+                '$addFields': {
+                    'lineupSlot': {
+                        '$cond': [
+                            {
+                                '$in': [
+                                    '$batter',
+                                    '$relevantLineup'
+                                ]
+                            }, {
+                                '$concat': [
+                                    '<i class="fa-solid fa-',
+                                    {
+                                        '$toString': {
+                                            '$add': [
+                                                {
+                                                    '$indexOfArray': [
+                                                        '$relevantLineup',
+                                                        '$batter'
+                                                    ]
+                                                },
+                                                1
+                                            ]
+                                        }
+                                    },
+                                    '" style="padding: 2px;"></i>'
+                                ]
+                            }, {
+                                '$cond': [
+                                    {
+                                        '$eq': [
+                                            {
+                                                '$size': '$relevantLineup'
+                                            },
+                                            0
+                                        ]
+                                    },
+                                    '<i class="fas fa-circle-question"></i>',
+                                    '<i class="fas fa-circle-xmark" style="color: red;"></i>'
+                                ]
+                            }
+                        ]
+                    }
+                }
+            }, {
+                '$unset': [
+                    '_id',
+                    'relevantLineup'
+                ]
             }
         ])
 

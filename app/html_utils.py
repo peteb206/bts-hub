@@ -1,6 +1,6 @@
 import pandas as pd
 import re
-from datetime import datetime, timedelta
+from datetime import datetime
 import pymongo
 
 
@@ -9,7 +9,7 @@ def sidebar_links_html(db, current_endpoint, collapse_sidebar):
     year = available_dates[-1].split('-')[0]
     game_dates = [game_date for game_date in available_dates if game_date.startswith(year)]
     list_items = [
-        ['Dashboard', 'fas fa-home', '/dashboard'],
+        ['Dashboard', 'fas fa-home', '/'],
         # ['My Picks', 'fas fa-pencil-alt', '/picks'],
         # ['Leaderboard', 'fas fa-list-ol', '/leaderboard'],
         # ['Splits', 'fas fa-coins' , '/splits'],

@@ -172,7 +172,6 @@ def player_stats(stat_type, player_id):
                 }
             }
         ])))
-        print(at_bat_details_df.head())
     return jsonify({'data': summary_stats})
 
 
@@ -469,8 +468,6 @@ def render_content(path):
         date_string_as_datetime = datetime.strptime(query_parameters_dict['date'], '%Y-%m-%d')
         query_parameters_dict['date'] = date_string_as_datetime
         filter_values = date_string_as_datetime
-        if path == 'dashboard':
-            db.update_collection('games')
     elif ('startDate' in query_parameters) | ('endDate' in query_parameters):
         filter_types.append('date_range')
         filter_values = list()

@@ -24,7 +24,7 @@ class BTSHubMongoDB:
         self.__stats_api_url_ext = f'{self.__stats_api_url}/sports/1'
         self.__stats_api_default_params = 'lang=en&sportId=1'
         # Set dates
-        today = dt.today()
+        today = datetime.utcnow().date()
         self.date = date if date else today
         self.__today = today
         # Set info for baseball savant
@@ -302,6 +302,69 @@ class BTSHubMongoDB:
         return players_df[['year', 'playerId', 'teamId', 'playerName', 'position', 'bats', 'throws', 'injuredFlag']]
 
 
+    def get_days_games_from_mlb(self, date):
+        # Read json
+        games_dict = self.__get(f'{self.__stats_api_url}/schedule?{self.__stats_api_default_params}&gameType=R&date={date.strftime("%Y-%m-%d")}&hydrate=team,probablePitcher,lineups,weather')
+
+        # Weather icons
+        def get_icon(weather):
+            weather_icon = ''
+            if 'condition' in weather.keys():
+                icon_map =  {
+                    'clear': 'fa fa-sun',
+                    'sunny': 'fas fa-sun',
+                    'partly cloudy': 'fas fa-cloud-sun',
+                    'cloudy': 'fas fa-cloud',
+                    'overcast': 'fas fa-cloud',
+                    'rain': 'fas fa-cloud-rain',
+                    'roof closed': 'fas fa-people-roof',
+                    'dome': 'fas fa-people-roof'
+                }
+                weather_key, weather_icon = weather['condition'].lower(), weather['condition']
+                if weather_key in icon_map.keys():
+                    weather_icon = f'''
+                        <span title="{weather["condition"]}">
+                            <i class="{icon_map[weather_key]} weatherIcon"></i>
+                        </span>
+                    '''
+                if 'temp' in weather.keys():
+                    weather_icon += f'<span>{weather["temp"]} &#186;F</span>'
+            return weather_icon
+
+        def get_status(game):
+            status = game['status']['detailedState']
+            if 'score' in game['teams']['away'].keys():
+                status += f' ({game["teams"]["away"]["score"]} - {game["teams"]["home"]["score"]})'
+            return status
+
+        # Calculated
+        games_list, lineups_dict = list(), dict()
+        for game_date in games_dict['dates']:
+            for game in game_date['games']:
+                lineups_dict[game['gamePk']] = dict()
+                for side in ['away', 'home']:
+                    lineups_dict[game['gamePk']][game['teams'][side]['team']['id']] = dict()
+                    if 'lineups' in game.keys():
+                        if f'{side}Players' in game['lineups'].keys():
+                            i = 1
+                            for player in game['lineups'][f'{side}Players']:
+                                lineups_dict[game['gamePk']][game['teams'][side]['team']['id']][player['id']] = i
+                                i += 1
+                games_list.append({
+                    'time': (datetime.strptime(game['gameDate'], '%Y-%m-%dT%H:%M:%SZ') - timedelta(hours=5)).strftime('%H:%M'),
+                    'matchup': f'{game["teams"]["away"]["team"]["abbreviation"]} @ {game["teams"]["home"]["team"]["abbreviation"]}',
+                    'awayStarter': f'<a href="javascript:void(0)" class="float-left" onclick="playerView(this, {game["teams"]["away"]["probablePitcher"]["id"]}, \'pitcher\')"><i class="fas fa-arrow-circle-right rowSelectorIcon"></i></a><span class="playerText">{game["teams"]["away"]["probablePitcher"]["fullName"]}</span>' if 'probablePitcher' in game['teams']['away'].keys() else '',
+                    'homeStarter': f'<a href="javascript:void(0)" class="float-left" onclick="playerView(this, {game["teams"]["home"]["probablePitcher"]["id"]}, \'pitcher\')"><i class="fas fa-arrow-circle-right rowSelectorIcon"></i></a><span class="playerText">{game["teams"]["home"]["probablePitcher"]["fullName"]}</span>' if 'probablePitcher' in game['teams']['home'].keys() else '',
+                    'status': get_status(game),
+                    'weather': get_icon(game['weather'])
+                })
+
+        return {
+            'games': games_list,
+            'lineups': lineups_dict
+        }
+
+
     def get_games_from_mlb(self):
         # Read json
         games_dict = self.__get(f'{self.__stats_api_url}/schedule?{self.__stats_api_default_params}&gameType=R&season={self.date.year}&hydrate=probablePitcher,lineups,weather')
@@ -508,7 +571,7 @@ class BTSHubMongoDB:
             {
                 '$match': {
                     'gameDateTimeUTC': {
-                        '$lte': datetime.combine(self.date + timedelta(days=1), datetime.max.time())
+                        '$lte': datetime.combine(self.date, datetime.max.time())
                     }
                 }
             }, {
@@ -1316,13 +1379,11 @@ class BTSHubMongoDB:
 
 
     def eligible_batters(self, date=None):
+        today = date.strftime('%Y-%m-%d') == (datetime.utcnow() - timedelta(hours=5)).strftime('%Y-%m-%d')
         return self.get_db()['players'].aggregate([
             {
                 '$match': {
                     'year': date.year,
-                    'injuredFlag': {
-                        '$ne': True if date.strftime('%Y-%m-%d') == datetime.utcnow().strftime('%Y-%m-%d') else None # health only matters if today
-                    },
                     '$or': [
                         {
                             'position': {
@@ -1411,8 +1472,26 @@ class BTSHubMongoDB:
                 '$unwind': '$team'
             }, {
                 '$project': {
+                    '_id': 0,
                     'batter': '$playerId',
-                    'name': '$playerName',
+                    'name': {
+                        '$cond': [
+                            {
+                                '$ne': [
+                                    '$injuredFlag',
+                                    True if today else None # health only matters if today
+                                ]
+                            },
+                            '$playerName',
+                            {
+                                '$concat': [
+                                    '<span>',
+                                    '$playerName',
+                                    '</span><span style="padding-left: 5px; color: red;"><i class="fas fa-kit-medical"></i></span>',
+                                ]
+                            }
+                        ]  
+                    },
                     'teamId': '$teamId',
                     'team': '$team.teamAbbreviation',
                     'bats': '$bats',
@@ -1423,69 +1502,8 @@ class BTSHubMongoDB:
                             'date': '$games.gameDateTimeUTC',
                             'timezone': '-05:00'
                         }
-                    },
-                    'relevantLineup': {
-                        '$cond': [
-                            {
-                                '$eq': [
-                                    '$teamId',
-                                    '$games.awayTeamId'
-                                ]
-                            },
-                            '$games.awayLineup',
-                            '$games.homeLineup'
-                        ]
                     }
                 }
-            }, {
-                '$addFields': {
-                    'lineupSlot': {
-                        '$cond': [
-                            {
-                                '$in': [
-                                    '$batter',
-                                    '$relevantLineup'
-                                ]
-                            }, {
-                                '$concat': [
-                                    '<i class="fa-solid fa-',
-                                    {
-                                        '$toString': {
-                                            '$add': [
-                                                {
-                                                    '$indexOfArray': [
-                                                        '$relevantLineup',
-                                                        '$batter'
-                                                    ]
-                                                },
-                                                1
-                                            ]
-                                        }
-                                    },
-                                    '" style="padding: 2px;"></i>'
-                                ]
-                            }, {
-                                '$cond': [
-                                    {
-                                        '$eq': [
-                                            {
-                                                '$size': '$relevantLineup'
-                                            },
-                                            0
-                                        ]
-                                    },
-                                    '<i class="fas fa-circle-question"></i>',
-                                    '<i class="fas fa-circle-xmark" style="color: red;"></i>'
-                                ]
-                            }
-                        ]
-                    }
-                }
-            }, {
-                '$unset': [
-                    '_id',
-                    'relevantLineup'
-                ]
             }
         ])
 

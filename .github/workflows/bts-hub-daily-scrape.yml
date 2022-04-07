@@ -1,7 +1,7 @@
 name: bts-hub-daily-scrape
 on:
    schedule:
-      - cron: '0 14 * * *' # runs at 2:00 PM UTC (8:00 AM CST) each day
+      - cron: '0 13 * * *' # runs at 1:00 PM UTC (8:00 AM CST) each day
    workflow_dispatch:
 jobs:
    build:

@@ -127,13 +127,28 @@ def display_html(db, path, filters={}):
     html = ''
     if path == 'dashboard':
         date = filters['date']
+
+        todays_games = db.get_days_games_from_mlb(date)
+
+        def get_lineup_slot(lineups_dict, game_pk, team_id, player_id):
+            slot = '<i class="fas fa-circle-question"></i>'
+            if game_pk in lineups_dict.keys():
+                if team_id in lineups_dict[game_pk].keys():
+                    if player_id in lineups_dict[game_pk][team_id].keys():
+                        slot = lineups_dict[game_pk][team_id][player_id]
+                    elif len(lineups_dict[game_pk][team_id].keys()) > 0:
+                        slot = '<i class="fas fa-circle-xmark" style="color: red;"></i>'
+            return slot
+
         eligible_batters_df = pd.DataFrame(list(db.eligible_batters(date=date))) # merge this with analytics to provide prediction
+        eligible_batters_df['lineup'] = eligible_batters_df.apply(lambda row: get_lineup_slot(todays_games['lineups'], row['gamePk'], row['teamId'], row['batter']), axis = 1)
         eligible_batters_df['batter'] = eligible_batters_df.apply(lambda row: f'<a href="javascript:void(0)" class="float-left" onclick="playerView(this, {row["batter"]}, \'batter\')"><i class="fas fa-arrow-circle-right rowSelectorIcon"></i></a><span class="playerText">{row["name"]}</span>', axis=1)
+
         html =  f'''
             <div id="dashboardTablesRow" class="row">
                 <div class="col-5">
                     <div class="row">
-                        {html_table('eligibleBatters', eligible_batters_df[['batter', 'team', 'time', 'lineupSlot']], title='Eligible Batters')}
+                        {html_table('eligibleBatters', eligible_batters_df[['batter', 'team', 'time', 'lineup']], title='Eligible Batters')}
                     </div>
                     <div id="playerImageAndNameRow" class="row" style="padding-top: 10px;">
                         <div class="col" style="max-width: 125px; margin-right: 10px;">
@@ -160,18 +175,7 @@ def display_html(db, path, filters={}):
                 </div>
                 <div class="col-7">
                     <div class="row">
-                        <table id="todaysGames" class="nowrap">
-                            <thead>
-                                <tr>
-                                    <th>Time</th>
-                                    <th>Matchup</th>
-                                    <th>Away Starter</th>
-                                    <th>Home Starter</th>
-                                    <th>Status</th>
-                                    <th>Weather</th>
-                                </tr>
-                            </thead>
-                        </table>
+                        {html_table('todaysGames', todays_games['games'], title="Today's Games")}
                     </div>
                 </div>
             </div>

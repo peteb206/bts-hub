@@ -22,6 +22,10 @@ $(window).on('load', function () {
                 if (thisTableId == 'eligibleBatters') {
                     tableSettings.lengthChange = false;
                     tableSettings.info = false;
+                } else if (thisTableId == 'todaysGame') {
+                    tableSettings.paging = false;
+                    tableSettings.searching = false;
+                    tableSettings.info = false;
                 }
                 var thisDataTable = thisTable.DataTable(tableSettings);
                 dataTables.push(thisDataTable);
@@ -31,7 +35,7 @@ $(window).on('load', function () {
                     addTableTitle(thisTable, captionText);
                 });
             });
-            loadDashboard();
+            // loadDashboard();
             let script = document.createElement('script');
             script.src = '/static/js/filters.js';
             document.head.appendChild(script);

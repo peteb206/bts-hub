@@ -304,7 +304,7 @@ class BTSHubMongoDB:
 
     def get_days_games_from_mlb(self, date):
         # Read json
-        games_dict = self.__get(f'{self.__stats_api_url}/schedule?{self.__stats_api_default_params}&gameType=R&date={date.strftime("%Y-%m-%d")}&hydrate=team,probablePitcher,lineups,weather')
+        games_dict = self.__get(f'{self.__stats_api_url}/schedule?{self.__stats_api_default_params}&gameType=R&date={date.strftime("%Y-%m-%d")}&hydrate=team,probablePitcher,lineups,weather,linescore')
 
         # Weather icons
         def get_icon(weather):
@@ -333,7 +333,9 @@ class BTSHubMongoDB:
 
         def get_status(game):
             status = game['status']['detailedState']
-            if 'score' in game['teams']['away'].keys():
+            if status == 'In Progress':
+                status = f'{game["linescore"]["inningHalf"][:3]} {game["linescore"]["currentInningOrdinal"]}'
+            if ('score' in game['teams']['away'].keys()) & (status not in ['Warmup', 'Pre-Game', 'Scheduled']):
                 status += f' ({game["teams"]["away"]["score"]} - {game["teams"]["home"]["score"]})'
             return status
 

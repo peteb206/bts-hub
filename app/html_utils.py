@@ -51,20 +51,19 @@ def filters_html(filter_types, filter_values):
         date_value = filter_values.strftime('%a, %B %-d, %Y')
         filter_html = f'''
             <div class="col-auto">
-                <span class="datePickerLabel">Date:</span>
-                <input placeholder="None selected..." type="text" id="date" class="datepicker" value="{date_value}" readonly>
+                <input placeholder="Select a date..." type="text" id="date" class="datepicker" value="{date_value}" readonly>
             </div>
         '''
     elif 'date_range' in filter_types:
         date_value = [filter_value.strftime('%a, %B %-d, %Y') if filter_value else '' for filter_value in filter_values]
         filter_html = f'''
             <div class="col-auto">
-                <span class="datePickerLabel">Start Date:</span>
-                <input placeholder="None selected..." type="text" id="startDate" class="datepicker" value="{date_value[0]}" readonly>
+                <span class="datePickerLabel">From:</span>
+                <input placeholder="Select a date..." type="text" id="startDate" class="datepicker" value="{date_value[0]}" readonly>
             </div>
             <div class="col-auto">
-                <span class="datePickerLabel">End Date:</span>
-                <input placeholder="None selected..." type="text" id="endDate" class="datepicker" value="{date_value[1]}" readonly>
+                <span class="datePickerLabel">To:</span>
+                <input placeholder="Select a date..." type="text" id="endDate" class="datepicker" value="{date_value[1]}" readonly>
             </div>
         '''
     elif 'year' in filter_types:

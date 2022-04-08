@@ -45,25 +45,6 @@ let removeClass = function (element, className) {
     }
 }
 
-let getIcon = function (weather) {
-    var weatherKey = weather.toLowerCase();
-    var iconMap =  {
-        'clear': 'fa fa-sun',
-        'sunny': 'fas fa-sun',
-        'partly cloudy': 'fas fa-cloud-sun',
-        'cloudy': 'fas fa-cloud',
-        'overcast': 'fas fa-cloud',
-        'rain': 'fas fa-cloud-rain',
-        'roof closed': 'fas fa-people-roof',
-        'dome': 'fas fa-people-roof'
-    }
-    var weatherIcon = weather;
-    if (iconMap[weatherKey]) {
-        weatherIcon = '<span title="' + weather + '"><i class="' + iconMap[weatherKey] + ' weatherIcon"></i></span>';
-    }
-    return weatherIcon;
-}
-
 let addTableTitle = function (table, title) {
     var tableTitle = $('<span>')
         .attr('class', 'tableTitle')
@@ -77,48 +58,6 @@ let dataTablesRowCallback = function (row) {
         if (cellText.startsWith('<') && cellText.endsWith('>'))
             $(this).html(cellText);
     });
-}
-
-let loadDashboard = function () {
-    if ($('table#todaysGames').length) {
-        $.ajax({
-            type: 'GET',
-            url: 'https://statsapi.mlb.com/api/v1/schedule' + $(location).attr('search') + '&lang=en&sportId=1&hydrate=team,probablePitcher,weather',
-            dataType: 'json',
-            success: function (json) {
-                var gamesData = [];
-                var dates = json.dates;
-                if (dates.length) {
-                    var games = dates[0].games;
-                    for (var i = 0; i < games.length; i++) {
-                        var game = games[i];
-                        var gameDate = new Date(game.gameDate);
-                        var gameTime = [gameDate.getHours(), gameDate.getMinutes() < 10 ? '0' + gameDate.getMinutes() : gameDate.getMinutes()].join(':');
-                        gamesData.push([
-                            gameTime,
-                            game.teams.away.team.abbreviation + ' @ ' + game.teams.home.team.abbreviation,
-                            game.teams.away.probablePitcher ? '<a href="javascript:void(0)" class="float-left" onclick="playerView(this, ' + game.teams.away.probablePitcher.id + ', \'pitcher\')"><i class="fas fa-arrow-circle-right rowSelectorIcon"></i></a><span class="playerText">' + game.teams.away.probablePitcher.fullName + '</span>' : '',
-                            game.teams.home.probablePitcher ? '<a href="javascript:void(0)" class="float-left" onclick="playerView(this, ' + game.teams.home.probablePitcher.id + ', \'pitcher\')"><i class="fas fa-arrow-circle-right rowSelectorIcon"></i></a><span class="playerText">' + game.teams.home.probablePitcher.fullName + '</span>' : '',
-                            game.status.detailedState + (game.teams.away.score !== undefined ? ' (' + game.teams.away.score + ' - ' + game.teams.home.score + ')' : ''),
-                            (game.weather.condition ? getIcon(game.weather.condition) : '') + '<span>' + (game.weather.temp ? game.weather.temp + ' &#186;F</span>' : '')
-                        ]);
-                    }
-                }
-                var todaysGamesTable = $('table#todaysGames');
-                todaysGamesTable.DataTable({
-                    data: gamesData,
-                    paging: false,
-                    searching: false,
-                    info: false,
-                    rowCallback: dataTablesRowCallback
-                });
-                addTableTitle(todaysGamesTable, "Today's Games");
-            },
-            error: function () {
-                alert('Could not get game statuses.');
-            }
-        });
-    }
 }
 
 let gameLogsColumns = function (playerType) {

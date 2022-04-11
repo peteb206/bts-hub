@@ -45,7 +45,7 @@ def sidebar_links_html(db, current_endpoint, collapse_sidebar):
     return list_items_html
 
 
-def filters_html(filter_types, filter_values):
+def filters_html(path, filter_types, filter_values):
     filter_html = ''
     if 'date' in filter_types:
         date_value = filter_values.strftime('%a, %B %-d, %Y')
@@ -82,6 +82,19 @@ def filters_html(filter_types, filter_values):
                     <i class="fas fa-sync"></i>
                     <span class="buttonText refreshFilter">Go</span>
                 </button>
+            </div>
+        '''
+    if path == 'dashboard':
+        filter_html += '''
+            <div id="dashboardTabs" class="col-auto offset-md-1">
+                <ul class="nav nav-tabs" role="tab-list">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="#" onclick="showMainDashboard(this)">Today</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" onclick="showSeasonSummary(this)">Season Summary</a>
+                    </li>
+                </ul>
             </div>
         '''
     return filter_html
@@ -144,42 +157,51 @@ def display_html(db, path, filters={}):
         eligible_batters_df['batter'] = eligible_batters_df.apply(lambda row: f'<a href="javascript:void(0)" class="float-left" onclick="playerView(this, {row["batter"]}, \'batter\')"><i class="fas fa-arrow-circle-right rowSelectorIcon"></i></a><span class="playerText">{row["name"]}</span>', axis=1)
 
         html =  f'''
-            <div id="dashboardTablesRow" class="row">
-                <div class="col-5">
-                    <div class="row">
-                        {html_table('eligibleBatters', eligible_batters_df[['batter', 'team', 'time', 'lineup']], title='Eligible Batters')}
-                    </div>
-                    <div id="playerImageAndNameRow" class="row" style="padding-top: 10px;">
-                        <div class="col" style="max-width: 125px; margin-right: 10px;">
-                            <img id="playerImage" style="width: 125px; height: auto;"/><!-- https://securea.mlb.com/mlb/images/players/head_shot/generic.jpg -->
+            <div id="mainDashboard">
+                <div id="dashboardTablesRow" class="row">
+                    <div class="col-5">
+                        <div class="row">
+                            {html_table('eligibleBatters', eligible_batters_df[['batter', 'team', 'time', 'lineup']], title='Eligible Batters')}
                         </div>
-                        <div id="playerInfo" class="col">
-                            <div class="row">
-                                <h4 id="playerName" class="text-center"></h4>
+                        <div id="playerImageAndNameRow" class="row" style="padding-top: 10px;">
+                            <div class="col" style="max-width: 125px; margin-right: 10px;">
+                                <img id="playerImage" style="width: 125px; height: auto;"/><!-- https://securea.mlb.com/mlb/images/players/head_shot/generic.jpg -->
                             </div>
-                            <div class="row" style="padding-top: 5px;">
-                                <span id="playerTeam"></span>
+                            <div id="playerInfo" class="col">
+                                <div class="row">
+                                    <h4 id="playerName" class="text-center"></h4>
+                                </div>
+                                <div class="row" style="padding-top: 5px;">
+                                    <span id="playerTeam"></span>
+                                </div>
+                                <div class="row" style="padding-top: 5px;">
+                                    <span id="playerPosition"></span>
+                                </div>
+                                <div class="row" style="padding-top: 5px;">
+                                    <span id="playerBats"></span>
+                                </div>
+                                <div class="row" style="padding-top: 5px;">
+                                    <span id="playerThrows"></span>
+                                </div>
                             </div>
-                            <div class="row" style="padding-top: 5px;">
-                                <span id="playerPosition"></span>
-                            </div>
-                            <div class="row" style="padding-top: 5px;">
-                                <span id="playerBats"></span>
-                            </div>
-                            <div class="row" style="padding-top: 5px;">
-                                <span id="playerThrows"></span>
-                            </div>
+                        </div>
+                    </div>
+                    <div class="col-7">
+                        <div class="row">
+                            {html_table('todaysGames', todays_games['games'], title="Today's Games")}
                         </div>
                     </div>
                 </div>
-                <div class="col-7">
-                    <div class="row">
-                        {html_table('todaysGames', todays_games['games'], title="Today's Games")}
+                <div class="row">
+                    <div id="playerGameLogs" class="col">
                     </div>
                 </div>
             </div>
-            <div class="row">
-                <div id="playerGameLogs" class="col">
+            <div id="seasonSummary" class="row">
+                <h5 class="text-center">Productivity by Batting Order Spot</h5>
+                <div id="seasonSummaryPct" class="col-6">
+                </div>
+                <div id="seasonSummaryOth" class="col-6">
                 </div>
             </div>
         '''

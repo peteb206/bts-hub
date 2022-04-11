@@ -209,3 +209,15 @@ a, a:hover, a:focus {
     color: var(--secondary-color);
     line-height: 1;
 }
+.nav-tabs {
+    border-bottom: none;
+}
+.nav-link, .nav-link:focus, .nav-link:hover {
+    color: var(--main-color);
+    border-color: var(--main-color);
+}
+.nav-tabs .nav-link.active {
+    color: var(--secondary-color);
+    background-color: var(--main-color);
+    border-color: var(--secondary-color);
+}

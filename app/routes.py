@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 import pandas as pd
 import app.utils as utils
 import app.html_utils as html_utils
+from app.plotly import get_plot_data
 
 ####################################
 ########### HTML Pages #############
@@ -17,6 +18,13 @@ def favicon():
 @app.route('/', methods=['GET'])
 def base():
     return redirect('/dashboard')
+
+
+@app.route('/plotly/<plot_type>', methods=['GET'])
+def plotly_data(plot_type):
+    query_parameters_dict = utils.parse_request_arguments(request.args)
+    date = datetime.strptime(query_parameters_dict['date'], '%Y-%m-%d')
+    return jsonify({'data': get_plot_data('battingOrder', date)})
 
 
 @app.route('/playerDetails/<player_id>', methods=['GET'])
@@ -452,6 +460,7 @@ def render_page(path):
     collapse_sidebar = request.cookies.get('collapseSidebar') == 'true'
     return render_template(
         'base.html',
+        path=path,
         collapse_sidebar=collapse_sidebar,
         loading_text=f'Loading {path}...',
         sidebar_links_html=html_utils.sidebar_links_html(db, request.path, collapse_sidebar)
@@ -505,7 +514,7 @@ def render_content(path):
     return render_template(
         'content.html', # f'{path}.html'
         current_path=path,
-        filters_html=html_utils.filters_html(filter_types, filter_values),
+        filters_html=html_utils.filters_html(path, filter_types, filter_values),
         content_html=html_utils.display_html(db, path, filters=query_parameters_dict)
     )
 ####################################

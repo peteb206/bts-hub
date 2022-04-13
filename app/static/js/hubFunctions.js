@@ -182,118 +182,114 @@ let showSeasonSummary = function (anchor) {
     if ($('div#seasonSummary').find('svg').length == 0) {
         $.ajax({
             type: 'GET',
-            url: '/plotly/battingOrder' + $(location).attr('search'),
+            url: '/plotly/seasonSummary' + $(location).attr('search'),
             dataType: 'json',
             success: function (json) {
-                var group = [],
-                    values = {},
-                    labels = {},
-                    standardPlotData = [],
-                    stackedPlotData = [],
-                    stats = ['xH', 'BIP', 'PA'];
-
-                for (var lineupSlot = 0; lineupSlot < json.data.length; lineupSlot++) {
-                    var slot = json.data[lineupSlot];
-                    group.push(slot.lineupSlot);
-                    for (var statNum = 0; statNum < stats.length; statNum++) {
-                        var stat = stats[statNum];
-                        if (values[stat] === undefined) {
-                            values[stat] = [];
-                            labels[stat] = [];
-                        }
-                        var value = slot[stats[statNum]];
-                        labels[stat].push(value);
-                        if (stat == 'BIP') {
-                            value -= slot['xH'];
-                        } else if (stat == 'PA') {
-                            value -= slot['BIP'];
-                        }
-                        values[stat].push(value);
-                    }
-                }
-
-                var hitPctValues = json.data.map(a => (a['H %'] * 100).toFixed(1).toString() + ' %');
-                standardPlotData.push({
-                    x: group,
-                    y: hitPctValues,
-                    name: 'H %',
-                    type: 'bar',
-                    text: hitPctValues,
-                    textposition: 'auto',
-                    textfont: {
-                        color: 'white'
-                    },
-                    hoverinfo: 'none'
-                });
-                for (var statNum = 0; statNum < stats.length; statNum++) {
-                    var stat = stats[statNum];
-                    stackedPlotData.push({
-                        x: group,
-                        y: values[stat],
-                        name: stat,
-                        type: 'bar',
-                        // orientation: 'h',
-                        text: labels[stat],
-                        textposition: 'auto',
-                        textfont: {
-                            color: 'white'
-                        },
-                        hoverinfo: 'none'
-                    });
-                }
-
-                var plotLayout = {
-                    barmode: 'stack',
-                    // title: {
-                    //     text: '',
-                    //     color: 'var(--main-color)'
-                    // },
-                    // showlegend: false,
-                    legend: {
-                        bgcolor: '#BEBEBE',
-                        x: 1,
-                        xanchor: 'right',
-                        y: 1
-                    },
-                    yaxis: {
-                        gridcolor: 'black',
-                        gridwidth: 0.5,
-                        linecolor: 'black',
-                        linewidth: 0.5,
-                        mirror: true
-                    },
-                    xaxis: {
-                        text: 'Lineup Slot',
-                        type: 'category',
-                        // linecolor: 'var(--main-color)',
-                        // linewidth: 1,
-                        // mirror: true
-                    },
-                    // autosize: false,
-                    // width: 500,
-                    // height: 400,
-                    // margin: {
-                    //     l: 40,
-                    //     r: 40,
-                    //     b: 40,
-                    //     t: 40,
-                    //     pad: 4
-                    // },
-                    paper_bgcolor: 'rgba(0, 0, 0, 0)',
-                    plot_bgcolor: 'rgba(0, 0, 0, 0)'
-                }
-
-                var plotConfig = {
-                    displayModeBar: false
-                };
-
                 addClass($('#spinnerDiv'), 'hidden');
                 removeClass($('#content'), 'hidden');
 
-                Plotly.newPlot('seasonSummaryPct', standardPlotData, plotLayout, plotConfig);
-                // delete plotLayout.title;
-                Plotly.newPlot('seasonSummaryOth', stackedPlotData, plotLayout, plotConfig);
+                createBarGraph('hitPctByLineup', json.data, 'lineupSlot', ['H %'], 'Hit % by Lineup Slot');
+                createBarGraph('otherStatsByLineup', json.data, 'lineupSlot', ['xH', 'BIP', 'PA'], 'Opportunity & Success by Lineup Slot');
+                createBarGraph('hitPctByHomeAway', json.data, 'homeAway', ['H %'], 'Hit % by Home/Away');
+                createBarGraph('otherStatsByHomeAway', json.data, 'homeAway', ['xH', 'BIP', 'PA'], 'Opportunity & Success by Home/Away');
+                createBarGraph('hitPctByDayNight', json.data, 'gameTime', ['H %'], 'Hit % by Day/Night');
+                createBarGraph('otherStatsByDayNight', json.data, 'gameTime', ['xH', 'BIP', 'PA'], 'Opportunity & Success by Day/Night');
             }
         });
+    } else {
+        addClass($('#spinnerDiv'), 'hidden');
+        removeClass($('#content'), 'hidden');
     }
+}
+
+let createBarGraph = function (targetDiv, data, group, stats, title) {
+    var plotData = [];
+    var groupValues = [...new Set(data.map(a => a[group]))];
+    for (var i = 0; i < stats.length; i++) {
+        var stat = stats[i];
+        var statValues = [];
+        var labels = [];
+        for (var j = 0; j < groupValues.length; j++) {
+            var groupValue = groupValues[j];
+            var relevantStatObjects = data.filter(split => split[group] == groupValue);
+            var numerator = 0;
+            var numeratorAdj = 0;
+            var denominator = 0;
+            for (var k = 0; k < relevantStatObjects.length; k++) {
+                var relevantStatObject = relevantStatObjects[k];
+                var value = relevantStatObject[stat];
+                numerator += value * relevantStatObject.G;
+                if (stat == 'BIP') {
+                    value -= relevantStatObject['xH'];
+                } else if (stat == 'PA') {
+                    value -= relevantStatObject['BIP'];
+                }
+                numeratorAdj += value * relevantStatObject.G;
+                denominator += relevantStatObject.G;
+            }
+            labels.push((numerator / denominator).toFixed(2));
+            statValues.push((numeratorAdj / denominator).toFixed(2));
+        }
+        plotData.push({
+            x: groupValues,
+            y: statValues,
+            name: stat,
+            type: 'bar',
+            // orientation: 'h',
+            text: labels,
+            textposition: 'inside',
+            insidetextanchor: 'middle',
+            textfont: {
+                color: 'white'
+            },
+            hoverinfo: 'none'
+        });
+    }
+
+    var plotLayout = {
+        barmode: 'stack',
+        title: {
+            text: title
+        },
+        // showlegend: false,
+        legend: {
+            bgcolor: '#BEBEBE',
+            x: 1,
+            xanchor: 'right',
+            y: 1
+        },
+        yaxis: {
+            range: [0, stats.length === 1 ? 1 : 5],
+            gridcolor: 'black',
+            gridwidth: 0.5,
+            linecolor: 'black',
+            linewidth: 0.5,
+            mirror: true
+        },
+        xaxis: {
+            text: 'Lineup Slot',
+            type: 'category',
+            // linecolor: 'var(--main-color)',
+            // linewidth: 1,
+            // mirror: true
+        },
+        // autosize: false,
+        // width: 500,
+        // height: 400,
+        margin: {
+            l: 30,
+            r: 30,
+            b: 30,
+            t: 30,
+            pad: 3
+        },
+        paper_bgcolor: 'rgba(0, 0, 0, 0)',
+        plot_bgcolor: 'rgba(0, 0, 0, 0)'
+    }
+
+    var plotConfig = {
+        displayModeBar: false
+    };
+
+    Plotly.newPlot(targetDiv, plotData, plotLayout, plotConfig);
 }

@@ -9,7 +9,7 @@ def sidebar_links_html(db, current_endpoint, collapse_sidebar):
     year = available_dates[-1].split('-')[0]
     game_dates = [game_date for game_date in available_dates if game_date.startswith(year)]
     list_items = [
-        ['Dashboard', 'fas fa-home', '/'],
+        ['Dashboard', 'fas fa-home', '/dashboard'],
         # ['My Picks', 'fas fa-pencil-alt', '/picks'],
         # ['Leaderboard', 'fas fa-list-ol', '/leaderboard'],
         # ['Splits', 'fas fa-coins' , '/splits'],
@@ -154,6 +154,7 @@ def display_html(db, path, filters={}):
 
         eligible_batters_df = pd.DataFrame(list(db.eligible_batters(date=date))) # merge this with analytics to provide prediction
         eligible_batters_df['lineup'] = eligible_batters_df.apply(lambda row: get_lineup_slot(todays_games['lineups'], row['gamePk'], row['teamId'], row['batter']), axis = 1)
+        # TO DO: analytics of batter attributes
         eligible_batters_df['batter'] = eligible_batters_df.apply(lambda row: f'<a href="javascript:void(0)" class="float-left" onclick="playerView(this, {row["batter"]}, \'batter\')"><i class="fas fa-arrow-circle-right rowSelectorIcon"></i></a><span class="playerText">{row["name"]}</span>', axis=1)
 
         html =  f'''
@@ -197,11 +198,16 @@ def display_html(db, path, filters={}):
                     </div>
                 </div>
             </div>
-            <div id="seasonSummary" class="row">
-                <h5 class="text-center">Productivity by Batting Order Spot</h5>
-                <div id="seasonSummaryPct" class="col-6">
+            <div id="seasonSummary" class="hidden">
+                <div class="row">
+                    <div id="hitPctByLineup" class="col-6"></div>
+                    <div id="otherStatsByLineup" class="col-6"></div>
                 </div>
-                <div id="seasonSummaryOth" class="col-6">
+                <div class="row">
+                    <div id="hitPctByHomeAway" class="col-3"></div>
+                    <div id="otherStatsByHomeAway" class="col-3"></div>
+                    <div id="hitPctByDayNight" class="col-3"></div>
+                    <div id="otherStatsByDayNight" class="col-3"></div>
                 </div>
             </div>
         '''

@@ -24,7 +24,7 @@ def base():
 def plotly_data(plot_type):
     query_parameters_dict = utils.parse_request_arguments(request.args)
     date = datetime.strptime(query_parameters_dict['date'], '%Y-%m-%d')
-    return jsonify({'data': get_plot_data('battingOrder', date)})
+    return jsonify({'data': get_plot_data(plot_type, date)})
 
 
 @app.route('/playerDetails/<player_id>', methods=['GET'])

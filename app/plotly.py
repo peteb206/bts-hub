@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 
 def get_plot_data(plot_type, date):
     out = list()
-    if plot_type == 'battingOrder':
+    if plot_type == 'seasonSummary':
         out  = list(db.get_db()['atBats'].aggregate([
             {
                 '$match': {
@@ -107,6 +107,24 @@ def get_plot_data(plot_type, date):
                             ]
                         }
                     },
+                    'homeAway': {
+                        '$first': {
+                            '$cond': [
+                                '$inningBottomFlag',
+                                'Home',
+                                'Away'
+                            ]
+                        }
+                    },
+                    'gameTime': {
+                        '$first': {
+                            '$cond': [
+                                '$games.dayGameFlag',
+                                'Day',
+                                'Night'
+                            ]
+                        }
+                    },
                     'battingOrderIndex': {
                         '$max': {
                             '$indexOfArray': [
@@ -123,8 +141,16 @@ def get_plot_data(plot_type, date):
                     }
                 }
             }, {
+                '$match': {
+                    'battingOrderIndex': {
+                        '$gte': 0
+                    }
+                }
+            }, {
                 '$group': {
                     '_id': {
+                        'homeAway': '$homeAway',
+                        'gameTime': '$gameTime',
                         'battingOrderIndex': '$battingOrderIndex'
                     },
                     'PA': {
@@ -160,18 +186,14 @@ def get_plot_data(plot_type, date):
             }, {
                 '$project': {
                     '_id': 0,
+                    'gameTime': '$_id.gameTime',
+                    'homeAway': '$_id.homeAway',
                     'lineupSlot': {
-                        '$replaceAll': {
-                            'input': {
-                                '$toString': {
-                                    '$add': [
-                                        '$_id.battingOrderIndex',
-                                        1
-                                    ]
-                                }
-                            },
-                            'find': '0',
-                            'replacement': 'Sub'
+                        '$toString': {
+                            '$add': [
+                                '$_id.battingOrderIndex',
+                                1
+                            ]
                         }
                     },
                     'PA': {
@@ -208,10 +230,13 @@ def get_plot_data(plot_type, date):
                             },
                             4
                         ]
-                    }
+                    },
+                    'G': '$G'
                 }
             }, {
                 '$sort': {
+                    'homeAway': 1,
+                    'gameTime': 1,
                     'lineupSlot': 1
                 }
             }

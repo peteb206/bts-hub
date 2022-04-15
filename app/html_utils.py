@@ -95,6 +95,9 @@ def filters_html(path, filter_types, filter_values):
                     <li class="nav-item">
                         <a class="nav-link" href="#" onclick="showSeasonSummary(this)">Season Summary</a>
                     </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="https://www.mlb.com/play/games" target="_blank">Make Pick</a>
+                    </li>
                 </ul>
             </div>
         '''
@@ -277,7 +280,7 @@ def display_html(db, path, filters={}):
         eligible_batters_df = pd.merge(eligible_batters_df, batter_per_pa_vs_bullpen_df, how='left', on=['batter'], suffixes=['', ' vs Bullpen'])
         eligible_batters_df = pd.merge(eligible_batters_df, batter_per_pa_vs_rhp_lhp_df, how='left', on=['batter'])
         eligible_batters_df['lineup'] = eligible_batters_df.apply(lambda row: get_lineup_slot(todays_games['lineups'], row['batterLineupSlot'], row['gamePk'], row['teamId'], row['batter']), axis = 1)
-        eligible_batters_df['batter'] = eligible_batters_df.apply(lambda row: f'<a href="javascript:void(0)" class="float-left" onclick="playerView(this, {row["batter"]}, \'batter\')"><i class="fas fa-arrow-circle-right rowSelectorIcon"></i></a><span class="playerText">{row["name"]}</span>', axis=1)
+        eligible_batters_df['batter'] = eligible_batters_df.apply(lambda row: f'<a href="javascript:void(0)" class="float-left" onclick="playerView(this, {row["batter"]}, \'batter\')"><i class="fas fa-arrow-circle-right rowSelectorIcon" player-id="{row["batter"]}"></i></a><span class="playerText">{row["name"]}</span>', axis=1)
 
         html =  f'''
             <div id="mainDashboard">
@@ -286,7 +289,7 @@ def display_html(db, path, filters={}):
                         <div class="row">
                             {html_table('eligibleBatters', eligible_batters_df[['batter', 'team', 'time', 'lineup']], title='Eligible Batters')}
                         </div>
-                        <div id="playerImageAndNameRow" class="row" style="padding-top: 10px;">
+                        <div id="playerImageAndNameRow" class="row selectedPlayer" style="padding-top: 10px;">
                             <div class="col" style="max-width: 125px; margin-right: 10px;">
                                 <img id="playerImage" style="width: 125px; height: auto;"/><!-- https://securea.mlb.com/mlb/images/players/head_shot/generic.jpg -->
                             </div>
@@ -320,7 +323,7 @@ def display_html(db, path, filters={}):
                         </div>
                     </div>
                 </div>
-                <div class="row">
+                <div class="row selectedPlayer">
                     <div id="playerGameLogs" class="col">
                     </div>
                 </div>

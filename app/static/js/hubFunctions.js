@@ -113,6 +113,7 @@ let gameLogsColumns = function (playerType) {
 
 let playerView = function (anchor, playerId, viewType) {
     if ($(anchor).find('i.fa-arrow-circle-right').length) {
+        $('table#eligibleBatters').attr('current-player', playerId);
         $('i.fa-arrow-circle-down').removeClass('fa-arrow-circle-down')
             .addClass('fa-arrow-circle-right');
         $('img#playerImage').attr('src', 'https://securea.mlb.com/mlb/images/players/head_shot/' + playerId + '.jpg');
@@ -129,7 +130,7 @@ let playerView = function (anchor, playerId, viewType) {
                         // Daily Projection
                         $.ajax({
                             type: 'GET',
-                            url: '/dailyProjections/' + playerData.fangraphsId + $(location).attr('search'),
+                            url: '/dailyProjections/' + playerData.fangraphsId + $(location).attr('search') + '&type=' + (viewType == 'pitcher' ? 'P' : 'OF'),
                             dataType: 'json',
                             success: function (json) {
                                 $('span#fangraphsProjection').text('Fangraphs Projected Hits: ' + json.data);
@@ -177,6 +178,13 @@ let playerView = function (anchor, playerId, viewType) {
         $(anchor).find('i')
             .removeClass('fa-arrow-circle-right')
             .addClass('fa-arrow-circle-down');
+        removeClass($('div.selectedPlayer'), 'hidden');
+    } else {
+        $(anchor).find('i.fa-arrow-circle-down').each(function () {
+            $(this).removeClass('fa-arrow-circle-down')
+                .addClass('fa-arrow-circle-right');
+        });
+        addClass($('div.selectedPlayer'), 'hidden');
     }
 }
 

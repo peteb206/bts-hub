@@ -1,7 +1,7 @@
 :root {
     --main-color: #165916;
     --secondary-color: #e1e8ef;
-    --content-font-size: 13px;
+    --table-font-size: 13px;
 }
 body {
     font-family: 'Open Sans';
@@ -10,6 +10,9 @@ body {
 }
 a {
     text-decoration: none;
+}
+div.dataTables_wrapper {
+    font-size: var(--table-font-size);
 }
 th, td {
     text-align: center;
@@ -46,7 +49,6 @@ span.tableTitle {
 .belowFilter {
     position: relative;
     top: 75px;
-    font-size: var(--content-font-size);
 }
 input.datepicker {
     width: 200px

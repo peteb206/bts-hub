@@ -92,12 +92,13 @@ def player_view(player_id):
 def daily_projection(player_id):
     projected_hits, query_parameters_dict  = 'N/A', utils.parse_request_arguments(request.args)
     if (player_id != '') & (query_parameters_dict['date'] == (datetime.utcnow() - timedelta(hours=5)).strftime('%Y-%m-%d')):
-        req = db.session.get(f'https://www.fangraphs.com/api/players/stats/daily-projections?playerid={player_id}&position=OF')
+        req = db.session.get(f'https://www.fangraphs.com/api/players/stats/daily-projections?playerid={player_id}&position={query_parameters_dict["type"]}')
         response_json = json.loads(req.text)
-        if len(response_json) > 0:
-            response_json = response_json[0]
-            if 'H' in response_json.keys():
-                projected_hits = response_json['H']
+        if response_json:
+            if len(response_json) > 0:
+                response_json = response_json[0]
+                if 'H' in response_json.keys():
+                    projected_hits = response_json['H']
     return jsonify({'data': projected_hits})
 
 

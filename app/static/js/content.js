@@ -22,6 +22,12 @@ $(window).on('load', function () {
                 if (thisTableId == 'eligibleBatters') {
                     tableSettings.lengthChange = false;
                     tableSettings.info = false;
+                    tableSettings.drawCallback = function (settings) {
+                        var currentPlayer = $(this).attr('current-player');
+                        if (currentPlayer)
+                            $('i.fa-arrow-circle-down[player-id!="' + currentPlayer + '"').removeClass('fa-arrow-circle-down')
+                                .addClass('fa-arrow-circle-right');
+                    }
                 } else if (thisTableId == 'todaysGames') {
                     tableSettings.paging = false;
                     tableSettings.searching = false;
@@ -67,7 +73,7 @@ $(window).on('load', function () {
                             }
                         }
                     });
-        
+
                     // "Go" button on-click behavior
                     $('#updateFiltersButton').on('click', function () {
                         var filters = [];

@@ -1,8 +1,10 @@
 import os
+from urllib import response
 from app import app, db
 from flask import jsonify, render_template, request, redirect, send_from_directory
 from datetime import datetime, timedelta
 import pandas as pd
+import json
 import app.utils as utils
 import app.html_utils as html_utils
 from app.plotly import get_plot_data
@@ -77,11 +79,26 @@ def player_view(player_id):
                 'position': '$position',
                 'bats': '$bats',
                 'throws': '$throws',
-                'injured': '$injuredFlag'
+                'injured': '$injuredFlag',
+                'fangraphsId': '$fangraphsId'
             }
         }
     ]))
-    return jsonify({'data': player_data_dict[0]})
+    out = player_data_dict[0]
+    return jsonify({'data': out})
+
+
+@app.route('/dailyProjections/<player_id>', methods=['GET'])
+def daily_projection(player_id):
+    projected_hits, query_parameters_dict  = 'N/A', utils.parse_request_arguments(request.args)
+    if (player_id != '') & (query_parameters_dict['date'] == (datetime.utcnow() - timedelta(hours=5)).strftime('%Y-%m-%d')):
+        req = db.session.get(f'https://www.fangraphs.com/api/players/stats/daily-projections?playerid={player_id}&position=OF')
+        response_json = json.loads(req.text)
+        if len(response_json) > 0:
+            response_json = response_json[0]
+            if 'H' in response_json.keys():
+                projected_hits = response_json['H']
+    return jsonify({'data': projected_hits})
 
 
 @app.route('/summaryStats/<stat_type>/<player_id>', methods=['GET'])
@@ -315,24 +332,32 @@ def game_logs(stat_type, player_id):
                     },
                     'h': '$H',
                     'order': {
-                        '$add': [
-                            {
-                                '$max': [
-                                    {
-                                        '$indexOfArray': [
-                                            '$game.awayLineup',
-                                            '$_id.batter'
-                                        ]
-                                    }, {
-                                        '$indexOfArray': [
-                                            '$game.homeLineup',
-                                            '$_id.batter'
-                                        ]
-                                    }
-                                ]
+                        '$replaceAll': {
+                            'input': {
+                                '$toString': {
+                                    '$add': [
+                                        {
+                                            '$max': [
+                                                {
+                                                    '$indexOfArray': [
+                                                        '$game.awayLineup',
+                                                        '$_id.batter'
+                                                    ]
+                                                }, {
+                                                    '$indexOfArray': [
+                                                        '$game.homeLineup',
+                                                        '$_id.batter'
+                                                    ]
+                                                }
+                                            ]
+                                        },
+                                        1
+                                    ]
+                                }
                             },
-                            1
-                        ]
+                            'find': '0',
+                            'replacement': 'Sub'
+                        }
                     }
                 }
             }
@@ -527,22 +552,6 @@ def render_content(path):
 @app.route('/data/availableDates')
 def available_dates():
     return jsonify({'data': db.get_available_dates()})
-
-
-@app.route('/data/<collection>')
-def data(collection):
-    collection_data = db.read_collection_as_list(collection, where_dict=utils.parse_request_arguments(request.args)) if collection in db.get_db().list_collection_names() else list()
-    return jsonify({'data': collection_data})
-
-
-@app.route('/columns', defaults={'collection': None})
-@app.route('/columns/<collection>')
-def columns(collection):
-    collection_columns = list()
-    collections = [collection] if collection else db.get_db().list_collection_names()
-    for single_collection in collections:
-        collection_columns.append(db.collection_columns(single_collection))
-    return jsonify({'data': collection_columns})
 ####################################
 ####### End JSON Endpoints #########
 ####################################

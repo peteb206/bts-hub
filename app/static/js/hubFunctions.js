@@ -60,6 +60,10 @@ let dataTablesRowCallback = function (row) {
     });
 }
 
+let loadDashboard = function () {
+
+}
+
 let gameLogsColumns = function (playerType) {
     var columns = [];
     if (playerType == 'batter') {
@@ -69,7 +73,7 @@ let gameLogsColumns = function (playerType) {
                 title: 'Date'
             }, {
                 data: 'order',
-                title: 'Lineup Spot'
+                title: 'Lineup Slot'
             }, {
                 data: 'pa',
                 title: 'PA'
@@ -121,8 +125,20 @@ let playerView = function (anchor, playerId, viewType) {
             success: function (json) {
                 var playerData = json.data;
                 Object.keys(playerData).forEach(function (attribute) {
-                    var attributeProperCase = attribute.charAt(0).toUpperCase() + attribute.substring(1);
-                    $('#player' + attributeProperCase).text((attributeProperCase == 'Name' ? '' : attributeProperCase + ': ') + playerData[attribute]);
+                    if (attribute == 'fangraphsId') {
+                        // Daily Projection
+                        $.ajax({
+                            type: 'GET',
+                            url: '/dailyProjections/' + playerData.fangraphsId + $(location).attr('search'),
+                            dataType: 'json',
+                            success: function (json) {
+                                $('span#fangraphsProjection').text('Fangraphs Projected Hits: ' + json.data);
+                            }
+                        });
+                    } else {
+                        var attributeProperCase = attribute.charAt(0).toUpperCase() + attribute.substring(1);
+                        $('#player' + attributeProperCase).text((attributeProperCase == 'Name' ? '' : attributeProperCase + ': ') + playerData[attribute]);
+                    }
                 });
             }
         });
@@ -189,11 +205,12 @@ let showSeasonSummary = function (anchor) {
                 removeClass($('#content'), 'hidden');
 
                 createBarGraph('hitPctByLineup', json.data, 'lineupSlot', ['H %'], 'Hit % by Lineup Slot');
-                createBarGraph('otherStatsByLineup', json.data, 'lineupSlot', ['xH', 'BIP', 'PA'], 'Opportunity & Success by Lineup Slot');
+                createBarGraph('otherStatsByLineup', json.data, 'lineupSlot', ['xH', 'BIP', 'PA'], 'Lineup Slot Breakdown');
+                createBarGraph('hitPctByPAs', json.data, 'PA', ['H %'], 'Hit % by # of PAs');
                 createBarGraph('hitPctByHomeAway', json.data, 'homeAway', ['H %'], 'Hit % by Home/Away');
-                createBarGraph('otherStatsByHomeAway', json.data, 'homeAway', ['xH', 'BIP', 'PA'], 'Opportunity & Success by Home/Away');
+                createBarGraph('otherStatsByHomeAway', json.data, 'homeAway', ['xH', 'BIP', 'PA'], 'Home/Away Breakdown');
                 createBarGraph('hitPctByDayNight', json.data, 'gameTime', ['H %'], 'Hit % by Day/Night');
-                createBarGraph('otherStatsByDayNight', json.data, 'gameTime', ['xH', 'BIP', 'PA'], 'Opportunity & Success by Day/Night');
+                createBarGraph('otherStatsByDayNight', json.data, 'gameTime', ['xH', 'BIP', 'PA'], 'Day/Night Breakdown');
             }
         });
     } else {
@@ -251,7 +268,7 @@ let createBarGraph = function (targetDiv, data, group, stats, title) {
         title: {
             text: title
         },
-        // showlegend: false,
+        showlegend: group == 'lineupSlot' && stats.length > 1,
         legend: {
             bgcolor: '#BEBEBE',
             x: 1,
@@ -275,7 +292,7 @@ let createBarGraph = function (targetDiv, data, group, stats, title) {
         },
         // autosize: false,
         // width: 500,
-        // height: 400,
+        height: 300,
         margin: {
             l: 30,
             r: 30,

@@ -71,11 +71,8 @@ def merge(base_df, dfs):
     suffixes = ['', '']
     for df_tuple in dfs:
         suffixes[1] = str(df_num)
-        df, how, on, index = df_tuple
-        if index == True:
-            base_df = pd.merge(base_df, df, how=how, left_index=True, right_index=True, suffixes=suffixes)
-        else:
-            base_df = pd.merge(base_df, df, how=how, on=on, suffixes=suffixes)
+        df, how, on = df_tuple
+        base_df = pd.merge(base_df, df, how=how, on=on, suffixes=suffixes)
         df_num += 1
     return base_df
 

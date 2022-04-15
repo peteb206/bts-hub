@@ -2,6 +2,7 @@ import pandas as pd
 import re
 from datetime import datetime
 import pymongo
+import numpy as np
 
 
 def sidebar_links_html(db, current_endpoint, collapse_sidebar):
@@ -140,10 +141,128 @@ def display_html(db, path, filters={}):
     if path == 'dashboard':
         date = filters['date']
 
-        todays_games = db.get_days_games_from_mlb(date)
+        # players_df = pd.DataFrame(list(db.get_db()['players'].find(
+        #     {
+        #         'year': date.year
+        #     }, {
+        #         '_id': False,
+        #         'playerId': True,
+        #         'playerName': True,
+        #         'bats': True
+        #     }
+        # )))
+        # teams_df = pd.DataFrame(list(db.get_db()['teams'].find(
+        #     {
+        #         'year': date.year
+        #     }, {
+        #         '_id': False,
+        #         'teamId': True,
+        #         'teamAbbreviation': True
+        #     }
+        # )))
+        games_df = pd.DataFrame(list(db.get_db()['games'].find(
+            {
+                'gameDateTimeUTC': {
+                    '$gte': datetime(date.year, 1, 1),
+                    '$lte': date
+                }
+            }, {
+                '_id': False,
+                'awayScore': False,
+                'homeScore': False
+            }
+        )))
+        at_bats_df = pd.DataFrame(list(db.get_db()['atBats'].find(
+            {
+                'gameDateTimeUTC': {
+                    '$gte': datetime(date.year, 1, 1),
+                    '$lte': date
+                }
+            }, {
+                '_id': False,
+                'atBatNumber': False,
+                'inning': False
+            }
+        )))
+        event_types_df = pd.DataFrame(list(db.get_db()['eventTypes'].find(
+            {}, {
+                '_id': False,
+                'eventTypeId': True,
+                'hitFlag': True,
+                'inPlayFlag': True
+            }
+        )))
+        park_factors_df = pd.DataFrame(list(db.get_db()['parkFactors'].find(
+            {
+                'year': date.year
+            }, {
+                '_id': False,
+                'year': False
+            }
+        )))
 
-        def get_lineup_slot(lineups_dict, game_pk, team_id, player_id):
-            slot = '<i class="fas fa-circle-question"></i>'
+        input_df = pd.merge(at_bats_df.rename({'batterId': 'batter'}, axis=1), event_types_df, how='inner', on=['eventTypeId'])
+        input_df = pd.merge(input_df, games_df, how='inner', on=['gamePk', 'gameDateTimeUTC'])
+        input_df = pd.merge(input_df, park_factors_df.rename({'rightHandedFlag': 'rightHandedBatterFlag'}, axis=1), how='left', on=['stadiumId', 'rightHandedBatterFlag', 'dayGameFlag'])
+        input_df['pitchingTeamId'] = input_df.apply(lambda row: row['awayTeamId'] if row['inningBottomFlag'] else row['homeTeamId'], axis=1)
+        input_df['parkFactor'] = input_df['parkFactor'].fillna(100).astype(int)
+        input_df['starterFlag'] = input_df.apply(lambda row: row['pitcherId'] == row['awayStarterId' if row['inningBottomFlag'] else 'homeStarterId'], axis=1)
+        input_df['batterLineupSlot'] = input_df.apply(lambda row: row['awayLineup'].index(row['batter']) + 1 if row['batter'] in row['awayLineup'] else row['homeLineup'].index(row['batter']) + 1 if row['batter'] in row['homeLineup'] else np.nan, axis=1)
+        # input_df.drop(['awayStarterId', 'homeStarterId', 'awayLineup', 'homeLineup', 'stadiumId'], axis=1, inplace=True)
+        # df = pd.merge(df, teams_df.rename({'teamId': 'awayTeamId'}, axis=1), how='inner', on=['awayTeamId'])
+        # df = pd.merge(df, teams_df.rename({'teamId': 'homeTeamId'}, axis=1), how='inner', on=['homeTeamId'], suffixes=['Away', 'Home'])
+        # df = pd.merge(df, players_df.rename({'playerId': 'batter'}, axis=1), how='inner', on=['batter'])
+        # df = pd.merge(df, players_df.drop(['bats'], axis=1).rename({'playerId': 'pitcherId'}, axis=1), how='inner', on=['pitcherId'], suffixes=['Batter', 'Pitcher'])
+
+        # Game
+        batter_by_game_df = input_df.groupby(['gameDateTimeUTC', 'gamePk', 'statcastFlag', 'inningBottomFlag', 'batter', 'batterLineupSlot']).agg({'hitFlag': 'sum', 'xBA': 'sum'}).reset_index().rename({'xBA': 'xH'}, axis=1)
+        batter_by_game_df['HG'] = batter_by_game_df['hitFlag'] >= 1
+        batter_by_game_df['xHG'] = batter_by_game_df['xH'] >= 1
+        batter_by_game_df['G'] = 1
+
+        def clean_split_columns(df):
+            columns, stat = list(), df.columns.names[-1]
+            for column in df.columns:
+                column_string = None
+                if isinstance(column, tuple):
+                    column_string = column[0]
+                    if stat == 'inningBottomFlag':
+                        column_string += ' Home' if column[1] else ' Away'
+                    else:
+                        if stat == 'rightHandedPitcherFlag':
+                            column_string += ' vs RHP' if column[1] else ' vs LHP'
+                        elif stat == 'rightHandedBatterFlag':
+                            column_string += ' vs RHB' if column[1] else ' vs LHB'
+                else:
+                    column_string = column
+                columns.append(column_string.replace('hitFlag', 'H / PA').replace('xBA', 'xH / PA'))
+            df.columns = columns
+            return df
+
+        # Season
+        batter_seasons_dfs = dict()
+        for key, index in {'': ['batter'], 'home/away': ['batter', 'inningBottomFlag']}.items():
+            batter_temp_df = batter_by_game_df.groupby(index).agg({'hitFlag': 'mean', 'xH': 'mean', 'HG': 'sum', 'xHG': 'sum', 'batterLineupSlot': 'mean', 'statcastFlag': 'sum', 'G': 'sum'}).rename({'hitFlag': 'H / G', 'xH': 'xH / G', 'statcastFlag': 'statcastG'}, axis=1)
+            batter_temp_df['H %'] = batter_temp_df['HG'] / batter_temp_df['G']
+            batter_temp_df['xH %'] = batter_temp_df['xHG'] / batter_temp_df['statcastG']
+            batter_temp_df = batter_temp_df.drop(['statcastG', 'HG', 'xHG'], axis=1).reset_index()
+            if key != '':
+                batter_temp_df = clean_split_columns(batter_temp_df.pivot_table(index=['batter'], values=['H / G', 'xH / G', 'G', 'H %', 'xH %'], columns=['inningBottomFlag'])).reset_index()
+            batter_seasons_dfs[key] = batter_temp_df
+        batter_season_df = batter_seasons_dfs[''] # batter | H / G | xH / G | G | H % | xH %
+        batter_home_away_df = batter_seasons_dfs['home/away'] # batter | G Away | G Home | H % Away | H % Home | H / G Away | H / G Home | xH % Away | xH % Home | xH / G Away | xH / G Home
+
+        # Batting splits
+        batter_per_pa_vs_bullpen_df = clean_split_columns(input_df.pivot_table(index=['batter'], values=['hitFlag', 'xBA'])).reset_index() # batter | H / PA | xH / PA
+        batter_per_pa_vs_rhp_lhp_df = clean_split_columns(input_df.pivot_table(index=['batter'], values=['hitFlag', 'xBA'], columns='rightHandedPitcherFlag')).reset_index() # batter | H / PA vs LHP | H / PA vs RHP | xH / PA vs LHP | xH / PA vs RHP
+
+        # Pitching splits
+        # pitcher_per_pa_df = clean_split_columns(input_df.pivot_table(index=['pitcherId'], values=['hitFlag', 'xBA'])).reset_index() # pitcherId | H / PA | xH / PA
+        # pitcher_per_pa_vs_rhb_lhp_df = clean_split_columns(input_df.pivot_table(index=['pitcherId'], values=['hitFlag', 'xBA'], columns='rightHandedBatterFlag')).reset_index() # pitcherId | H / PA vs LHB | H / PA vs RHB | xH / PA vs LHB | xH / PA vs RHB
+        # bullpen_per_pa_df = clean_split_columns(input_df[input_df['starterFlag'] == False].pivot_table(index=['pitchingTeamId'], values=['hitFlag', 'xBA'])).reset_index()
+
+        def get_lineup_slot(lineups_dict, avg_lineup_slot, game_pk, team_id, player_id):
+            slot = f'''<span class="batting-order"><i class="fas fa-circle-question"></i>{f'<span class="buttonText">{round(avg_lineup_slot, 1)}</span>' if avg_lineup_slot >= 0 else ''}</span>'''
             if game_pk in lineups_dict.keys():
                 if team_id in lineups_dict[game_pk].keys():
                     if player_id in lineups_dict[game_pk][team_id].keys():
@@ -152,9 +271,12 @@ def display_html(db, path, filters={}):
                         slot = '<i class="fas fa-circle-xmark" style="color: red;"></i>'
             return slot
 
-        eligible_batters_df = pd.DataFrame(list(db.eligible_batters(date=date))) # merge this with analytics to provide prediction
-        eligible_batters_df['lineup'] = eligible_batters_df.apply(lambda row: get_lineup_slot(todays_games['lineups'], row['gamePk'], row['teamId'], row['batter']), axis = 1)
-        # TO DO: analytics of batter attributes
+        todays_games, eligible_batters_df = db.get_days_games_from_mlb(date), pd.DataFrame(list(db.eligible_batters(date=date))) # merge this with analytics to provide prediction
+        eligible_batters_df = pd.merge(eligible_batters_df, batter_season_df, how='left', on=['batter'])
+        eligible_batters_df = pd.merge(eligible_batters_df, batter_home_away_df, how='left', on=['batter'])
+        eligible_batters_df = pd.merge(eligible_batters_df, batter_per_pa_vs_bullpen_df, how='left', on=['batter'], suffixes=['', ' vs Bullpen'])
+        eligible_batters_df = pd.merge(eligible_batters_df, batter_per_pa_vs_rhp_lhp_df, how='left', on=['batter'])
+        eligible_batters_df['lineup'] = eligible_batters_df.apply(lambda row: get_lineup_slot(todays_games['lineups'], row['batterLineupSlot'], row['gamePk'], row['teamId'], row['batter']), axis = 1)
         eligible_batters_df['batter'] = eligible_batters_df.apply(lambda row: f'<a href="javascript:void(0)" class="float-left" onclick="playerView(this, {row["batter"]}, \'batter\')"><i class="fas fa-arrow-circle-right rowSelectorIcon"></i></a><span class="playerText">{row["name"]}</span>', axis=1)
 
         html =  f'''
@@ -173,7 +295,12 @@ def display_html(db, path, filters={}):
                                     <h4 id="playerName" class="text-center"></h4>
                                 </div>
                                 <div class="row" style="padding-top: 5px;">
-                                    <span id="playerTeam"></span>
+                                    <div class="col">
+                                        <span id="playerTeam"></span>
+                                    </div>
+                                    <div class="col-8">
+                                        <span id="fangraphsProjection"></span>
+                                    </div>
                                 </div>
                                 <div class="row" style="padding-top: 5px;">
                                     <span id="playerPosition"></span>
@@ -204,10 +331,11 @@ def display_html(db, path, filters={}):
                     <div id="otherStatsByLineup" class="col-6"></div>
                 </div>
                 <div class="row">
-                    <div id="hitPctByHomeAway" class="col-3"></div>
-                    <div id="otherStatsByHomeAway" class="col-3"></div>
-                    <div id="hitPctByDayNight" class="col-3"></div>
-                    <div id="otherStatsByDayNight" class="col-3"></div>
+                    <div id="hitPctByPAs" class="col-4"></div>
+                    <div id="hitPctByHomeAway" class="col-2"></div>
+                    <div id="otherStatsByHomeAway" class="col-2"></div>
+                    <div id="hitPctByDayNight" class="col-2"></div>
+                    <div id="otherStatsByDayNight" class="col-2"></div>
                 </div>
             </div>
         '''

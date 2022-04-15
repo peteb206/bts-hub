@@ -151,10 +151,8 @@ def get_plot_data(plot_type, date):
                     '_id': {
                         'homeAway': '$homeAway',
                         'gameTime': '$gameTime',
-                        'battingOrderIndex': '$battingOrderIndex'
-                    },
-                    'PA': {
-                        '$avg': '$PA'
+                        'battingOrderIndex': '$battingOrderIndex',
+                        'PA': '$PA'
                     },
                     'xH': {
                         '$avg': '$xH'
@@ -196,12 +194,7 @@ def get_plot_data(plot_type, date):
                             ]
                         }
                     },
-                    'PA': {
-                        '$round': [
-                            '$PA',
-                            2
-                        ]
-                    },
+                    'PA': '$_id.PA',
                     'xH': {
                         '$round': [
                             '$xH',
@@ -237,7 +230,8 @@ def get_plot_data(plot_type, date):
                 '$sort': {
                     'homeAway': 1,
                     'gameTime': 1,
-                    'lineupSlot': 1
+                    'lineupSlot': 1,
+                    'PA': -1
                 }
             }
         ]))

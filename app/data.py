@@ -294,12 +294,19 @@ class BTSHubMongoDB:
         players_df['bats'] = players_df['batSide'].apply(lambda x: x['code'])
         players_df['throws'] = players_df['pitchHand'].apply(lambda x: x['code'])
         injured_players_list = self.injured_player_ids() if self.__today.year == self.date.year else list()
+        player_ids_df = pd.read_html('https://docs.google.com/spreadsheets/d/1JgczhD5VDQ1EiXqVG-blttZcVwbZd5_Ne_mefUGwJnk/pubhtml?gid=0&single=true')[0]
+        new_header = player_ids_df.iloc[0]
+        player_ids_df = player_ids_df[1:]
+        player_ids_df.columns = new_header
+        player_ids_df = player_ids_df[player_ids_df['MLBID'] > '0']
+        fangraphs_batter_ids = dict(zip(player_ids_df['MLBID'].astype(int), player_ids_df['IDFANGRAPHS']))
         players_df['injuredFlag'] = players_df['id'].apply(lambda x: x in injured_players_list)
+        players_df['fangraphsId'] = players_df['id'].apply(lambda x: fangraphs_batter_ids[x] if x in fangraphs_batter_ids.keys() else '')
 
         # Clean up dataframe
         players_df.rename({'id': 'playerId', 'fullName': 'playerName'}, axis=1, inplace=True)
         players_df.sort_values(by=['year', 'teamId', 'playerId'], ignore_index=True, inplace=True)
-        return players_df[['year', 'playerId', 'teamId', 'playerName', 'position', 'bats', 'throws', 'injuredFlag']]
+        return players_df[['year', 'playerId', 'teamId', 'playerName', 'position', 'bats', 'throws', 'injuredFlag', 'fangraphsId']]
 
 
     def get_days_games_from_mlb(self, date):

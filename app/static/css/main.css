@@ -223,3 +223,6 @@ a, a:hover, a:focus {
     background-color: var(--main-color);
     border-color: var(--secondary-color);
 }
+div#splitSummary > div {
+    padding-top: 15px;
+}

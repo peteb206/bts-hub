@@ -93,7 +93,7 @@ def filters_html(path, filter_types, filter_values):
                         <a class="nav-link active" href="#" onclick="showMainDashboard(this)">Today</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="#" onclick="showSeasonSummary(this)">Season Summary</a>
+                        <a class="nav-link" href="#" onclick="showSummary(this)">Split Summary</a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" href="https://www.mlb.com/play/games" target="_blank">Make Pick</a>
@@ -328,7 +328,7 @@ def display_html(db, path, filters={}):
                     </div>
                 </div>
             </div>
-            <div id="seasonSummary" class="hidden">
+            <div id="splitSummary" class="hidden">
                 <div class="row">
                     <div id="hitPctByLineup" class="col-6"></div>
                     <div id="otherStatsByLineup" class="col-6"></div>
@@ -339,6 +339,18 @@ def display_html(db, path, filters={}):
                     <div id="otherStatsByHomeAway" class="col-2"></div>
                     <div id="hitPctByDayNight" class="col-2"></div>
                     <div id="otherStatsByDayNight" class="col-2"></div>
+                </div>
+                <div class="row">
+                    <div id="hitPctByBattingTeam" class="col"></div>
+                </div>
+                <div class="row">
+                    <div id="otherStatsByBattingTeam" class="col"></div>
+                </div>
+                <div class="row">
+                    <div id="hitPctByPitchingTeam" class="col"></div>
+                </div>
+                <div class="row">
+                    <div id="otherStatsByPitchingTeam" class="col"></div>
                 </div>
             </div>
         '''

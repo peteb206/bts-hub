@@ -133,7 +133,7 @@ let playerView = function (anchor, playerId, viewType) {
                             url: '/dailyProjections/' + playerData.fangraphsId + $(location).attr('search') + '&type=' + (viewType == 'pitcher' ? 'P' : 'OF'),
                             dataType: 'json',
                             success: function (json) {
-                                $('span#fangraphsProjection').text('Fangraphs Projected Hits: ' + json.data);
+                                $('span#fangraphsProjection').text('Fangraphs Proj.: ' + json.data);
                             }
                         });
                     } else {
@@ -192,33 +192,38 @@ let playerView = function (anchor, playerId, viewType) {
 let showMainDashboard = function (anchor) {
     $('div#dashboardTabs > ul > li > a').removeClass('active');
     $(anchor).addClass('active');
-    addClass($('div#seasonSummary'), 'hidden');
+    addClass($('div#splitSummary'), 'hidden');
     removeClass($('div#mainDashboard'), 'hidden');
 }
 
-let showSeasonSummary = function (anchor) {
+let showSummary = function (anchor) {
     $('div#dashboardTabs > ul > li > a').removeClass('active');
     $(anchor).addClass('active');
     addClass($('div#mainDashboard'), 'hidden');
-    removeClass($('div#seasonSummary'), 'hidden');
+    removeClass($('div#splitSummary'), 'hidden');
     addClass($('#content'), 'hidden');
     removeClass($('#spinnerDiv'), 'hidden');
-    if ($('div#seasonSummary').find('svg').length == 0) {
+    if ($('div#splitSummary').find('svg').length == 0) {
         $.ajax({
             type: 'GET',
-            url: '/plotly/seasonSummary' + $(location).attr('search'),
+            url: '/plotly/splitSummary' + $(location).attr('search'),
             dataType: 'json',
             success: function (json) {
                 addClass($('#spinnerDiv'), 'hidden');
                 removeClass($('#content'), 'hidden');
 
-                createBarGraph('hitPctByLineup', json.data, 'lineupSlot', ['H %'], 'Hit % by Lineup Slot');
-                createBarGraph('otherStatsByLineup', json.data, 'lineupSlot', ['xH', 'BIP', 'PA'], 'Lineup Slot Breakdown');
-                createBarGraph('hitPctByPAs', json.data, 'PA', ['H %'], 'Hit % by # of PAs');
-                createBarGraph('hitPctByHomeAway', json.data, 'homeAway', ['H %'], 'Hit % by Home/Away');
-                createBarGraph('otherStatsByHomeAway', json.data, 'homeAway', ['xH', 'BIP', 'PA'], 'Home/Away Breakdown');
-                createBarGraph('hitPctByDayNight', json.data, 'gameTime', ['H %'], 'Hit % by Day/Night');
-                createBarGraph('otherStatsByDayNight', json.data, 'gameTime', ['xH', 'BIP', 'PA'], 'Day/Night Breakdown');
+                var data= json.data;
+                createBarGraph('hitPctByLineup', data, 'lineupSlot', ['H %'], 'Hit % by Lineup Slot');
+                createBarGraph('otherStatsByLineup', data, 'lineupSlot', ['xH', 'BIP', 'PA'], 'Lineup Slot Breakdown');
+                createBarGraph('hitPctByPAs', data, 'PA', ['H %'], 'Hit % by # of PAs');
+                createBarGraph('hitPctByHomeAway', data, 'homeAway', ['H %'], 'Hit % by Home/Away');
+                createBarGraph('otherStatsByHomeAway', data, 'homeAway', ['xH', 'BIP', 'PA'], 'Home/Away Breakdown');
+                createBarGraph('hitPctByDayNight', data, 'gameTime', ['H %'], 'Hit % by Day/Night');
+                createBarGraph('otherStatsByDayNight', data, 'gameTime', ['xH', 'BIP', 'PA'], 'Day/Night Breakdown');
+                createBarGraph('hitPctByBattingTeam', data, 'battingTeam', ['H %'], 'Hit % by Batting Team');
+                createBarGraph('otherStatsByBattingTeam', data, 'battingTeam', ['xH', 'BIP', 'PA'], 'Batting Team Breakdown');
+                createBarGraph('hitPctByPitchingTeam', data, 'pitchingTeam', ['H %'], 'Hit % by Pitching Team');
+                createBarGraph('otherStatsByPitchingTeam', data, 'pitchingTeam', ['xH', 'BIP', 'PA'], 'Pitching Team Breakdown');
             }
         });
     } else {
@@ -229,31 +234,20 @@ let showSeasonSummary = function (anchor) {
 
 let createBarGraph = function (targetDiv, data, group, stats, title) {
     var plotData = [];
-    var groupValues = [...new Set(data.map(a => a[group]))];
     for (var i = 0; i < stats.length; i++) {
         var stat = stats[i];
+        var groupValues = [];
         var statValues = [];
         var labels = [];
-        for (var j = 0; j < groupValues.length; j++) {
-            var groupValue = groupValues[j];
-            var relevantStatObjects = data.filter(split => split[group] == groupValue);
-            var numerator = 0;
-            var numeratorAdj = 0;
-            var denominator = 0;
-            for (var k = 0; k < relevantStatObjects.length; k++) {
-                var relevantStatObject = relevantStatObjects[k];
-                var value = relevantStatObject[stat];
-                numerator += value * relevantStatObject.G;
-                if (stat == 'BIP') {
-                    value -= relevantStatObject['xH'];
-                } else if (stat == 'PA') {
-                    value -= relevantStatObject['BIP'];
-                }
-                numeratorAdj += value * relevantStatObject.G;
-                denominator += relevantStatObject.G;
-            }
-            labels.push((numerator / denominator).toFixed(2));
-            statValues.push((numeratorAdj / denominator).toFixed(2));
+        for (const [groupValue, groupValueStats] of Object.entries(data[group])) {
+            groupValues.push(groupValue);
+            var value = groupValueStats[stat];
+            labels.push(value);
+            if (stat == 'BIP')
+                value -= groupValueStats.xH;
+            else if (stat == 'PA')
+                value -= groupValueStats.BIP;
+            statValues.push(value);
         }
         plotData.push({
             x: groupValues,

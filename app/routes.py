@@ -98,7 +98,12 @@ def daily_projection(player_id):
             if len(response_json) > 0:
                 response_json = response_json[0]
                 if 'H' in response_json.keys():
-                    projected_hits = response_json['H']
+                    projected_hits = ''
+                    if 'IP' in response_json.keys():
+                        projected_hits = f'{response_json["IP"]} IP, '
+                    elif 'PA' in response_json.keys():
+                        projected_hits = f'{response_json["PA"]} PA, '
+                    projected_hits += f'{response_json["H"]} H'
     return jsonify({'data': projected_hits})
 
 

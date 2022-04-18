@@ -25,7 +25,8 @@ $(window).on('load', function () {
                     tableSettings.drawCallback = function (settings) {
                         var currentPlayer = $(this).attr('current-player');
                         if (currentPlayer)
-                            $('i.fa-arrow-circle-down[player-id!="' + currentPlayer + '"').removeClass('fa-arrow-circle-down')
+                            $('i.fa-arrow-circle-down[player-id!="' + currentPlayer + '"]')
+                                .removeClass('fa-arrow-circle-down')
                                 .addClass('fa-arrow-circle-right');
                     }
                 } else if (thisTableId == 'todaysGames') {

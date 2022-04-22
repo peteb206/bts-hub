@@ -306,13 +306,20 @@ def display_html(db, path, filters={}):
                                     </div>
                                 </div>
                                 <div class="row" style="padding-top: 5px;">
-                                    <span id="playerPosition"></span>
+                                    <div class="col">
+                                        <span id="playerPosition"></span>
+                                    </div>
                                 </div>
                                 <div class="row" style="padding-top: 5px;">
                                     <span id="playerBats"></span>
                                 </div>
                                 <div class="row" style="padding-top: 5px;">
                                     <span id="playerThrows"></span>
+                                </div>
+                                <div class="row" style="padding-top: 5px;">
+                                    <div class="col">
+                                        <span id="batterVsStarter"></span>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -324,8 +331,7 @@ def display_html(db, path, filters={}):
                     </div>
                 </div>
                 <div class="row selectedPlayer">
-                    <div id="playerGameLogs" class="col">
-                    </div>
+                    <div id="playerGameLogs" class="col"></div>
                 </div>
             </div>
             <div id="splitSummary" class="hidden">

@@ -91,7 +91,7 @@ def player_view(player_id):
 @app.route('/dailyProjections/<player_id>', methods=['GET'])
 def daily_projection(player_id):
     projected_hits, query_parameters_dict  = 'N/A', utils.parse_request_arguments(request.args)
-    if (player_id != '') & (query_parameters_dict['date'] == (datetime.utcnow() - timedelta(hours=5)).strftime('%Y-%m-%d')):
+    if query_parameters_dict['date'] == (datetime.utcnow() - timedelta(hours=5)).strftime('%Y-%m-%d'):
         req = db.session.get(f'https://www.fangraphs.com/api/players/stats/daily-projections?playerid={player_id}&position={query_parameters_dict["type"]}')
         response_json = json.loads(req.text)
         if response_json:
@@ -110,99 +110,88 @@ def daily_projection(player_id):
 @app.route('/summaryStats/<stat_type>/<player_id>', methods=['GET'])
 def player_stats(stat_type, player_id):
     query_parameters_dict = utils.parse_request_arguments(request.args)
-    date = datetime.strptime(query_parameters_dict['date'], '%Y-%m-%d')
+    # date = datetime.strptime(query_parameters_dict['date'], '%Y-%m-%d')
     summary_stats = dict()
 
     if stat_type == 'batter':
-        at_bat_details_df = pd.DataFrame(list(db.get_db()['atBats'].aggregate([
-            {
-                '$match': {
-                    'batterId': int(player_id),
-                    'gameDateTimeUTC': {
-                        '$gte': datetime(date.year, 1, 1),
-                        '$lte': date + timedelta(hours=5)
-                    }
-                }
-            }, {
-                '$lookup': {
-                    'from': 'eventTypes',
-                    'let': {
-                        'eventTypeId': '$eventTypeId'
-                    },
-                    'pipeline': [
-                        {
-                            '$match': {
-                                '$expr': {
-                                    '$eq': [
-                                        '$eventTypeId',
-                                        '$$eventTypeId'
-                                    ]
-                                }
-                            }
+        summary_stats['vsStarter'] = dict()
+        if 'pitcher' in query_parameters_dict.keys():
+            if query_parameters_dict['pitcher']:
+                batter_vs_pitcher = list(db.get_db()['atBats'].aggregate([
+                    {
+                        '$match': {
+                            'batterId': int(player_id),
+                            'pitcherId': query_parameters_dict['pitcher']
                         }
-                    ],
-                    'as': 'event'
-                }
-            }, {
-                '$unwind': '$event'
-            }, {
-                '$lookup': {
-                    'from': 'games',
-                    'let': {
-                        'gamePk': '$gamePk',
-                        'gameDateTimeUTC': '$gameDateTimeUTC'
-                    },
-                    'pipeline': [
-                        {
-                            '$match': {
-                                '$expr': {
-                                    '$and': [
-                                        {
+                    }, {
+                        '$lookup': {
+                            'from': 'eventTypes',
+                            'let': {
+                                'eventTypeId': '$eventTypeId'
+                            },
+                            'pipeline': [
+                                {
+                                    '$match': {
+                                        '$expr': {
                                             '$eq': [
-                                                '$gamePk',
-                                                '$$gamePk'
-                                            ]
-                                        }, {
-                                            '$eq': [
-                                                '$gameDateTimeUTC',
-                                                '$$gameDateTimeUTC'
+                                                '$eventTypeId',
+                                                '$$eventTypeId'
                                             ]
                                         }
+                                    }
+                                }
+                            ],
+                            'as': 'event'
+                        }
+                    }, {
+                        '$unwind': '$event'
+                    }, {
+                        '$group': {
+                            '_id': {
+                                'batterId': '$batterId'
+                            },
+                            'PA': {
+                                '$sum': 1
+                            },
+                            'xH': {
+                                '$sum': {
+                                    '$cond': [
+                                        {
+                                            '$gte': [
+                                                '$xBA',
+                                                0
+                                            ]
+                                        },
+                                        '$xBA',
+                                        0
+                                    ]
+                                }
+                            },
+                            'H': {
+                                '$sum': {
+                                    '$cond': [
+                                        '$event.hitFlag',
+                                        1,
+                                        0
+                                    ]
+                                }
+                            },
+                            'BIP': {
+                                '$sum': {
+                                    '$cond': [
+                                        '$event.inPlayFlag',
+                                        1,
+                                        0
                                     ]
                                 }
                             }
                         }
-                    ],
-                    'as': 'game'
-                }
-            }, {
-                '$unwind': '$game'
-            }, {
-                '$project': {
-                    '_id': 0,
-                    'gamePk': '$gamePk',
-                    'gameDateTimeUTC': '$gameDateTimeUTC',
-                    'rightHandedBatterFlag': '$rightHandedBatterFlag',
-                    'rightHandedPitcherFlag': '$rightHandedPitcherFlag',
-                    'inningBottomFlag': '$inningBottomFlag',
-                    'hits': {
-                        '$cond': [
-                            '$event.hitFlag',
-                            1,
-                            0
-                        ]
-                    },
-                    'balls_in_play': {
-                        '$cond': [
-                            '$event.inPlayFlag',
-                            1,
-                            0
-                        ]
-                    },
-                    'statcast': '$game.statcastFlag'
-                }
-            }
-        ])))
+                    }, {
+                        '$unset': '_id'
+                    }
+                ]))
+                if len(batter_vs_pitcher):
+                    summary_stats['vsStarter'] = batter_vs_pitcher[0]
     return jsonify({'data': summary_stats})
 
 

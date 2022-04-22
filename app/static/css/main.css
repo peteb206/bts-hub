@@ -77,6 +77,9 @@ span[title="Partly Cloudy"] {
 span[title="Cloudy"], .batting-order {
     color: rgba(128, 128, 128, 0.681);
 }
+span[title="Overcast"], .batting-order {
+    color: rgb(128, 128, 128);
+}
 span[title="Roof Closed"] {
     color: var(--main-color);
 }

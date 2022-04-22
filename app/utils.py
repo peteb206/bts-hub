@@ -99,7 +99,7 @@ def parse_request_arguments(args):
                 value = int(value)
             elif value.replace('.', '', 1).isdigit():
                 value = float(value)
-            elif (value[0] == '{') & (value[-1] == '}'):
+            elif value.startswith('{') & value.endswith('}'):
                 try:
                     value = json.loads(value)
                 except json.decoder.JSONDecodeError:

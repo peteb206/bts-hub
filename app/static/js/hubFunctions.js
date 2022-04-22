@@ -128,14 +128,18 @@ let playerView = function (anchor, playerId, viewType) {
                 Object.keys(playerData).forEach(function (attribute) {
                     if (attribute == 'fangraphsId') {
                         // Daily Projection
-                        $.ajax({
-                            type: 'GET',
-                            url: '/dailyProjections/' + playerData.fangraphsId + $(location).attr('search') + '&type=' + (viewType == 'pitcher' ? 'P' : 'OF'),
-                            dataType: 'json',
-                            success: function (json) {
-                                $('span#fangraphsProjection').text('Fangraphs Proj.: ' + json.data);
-                            }
-                        });
+                        var fangraphsProjection = 'SaberSim: ';
+                        if (playerData[attribute] == '')
+                            $('span#fangraphsProjection').text(fangraphsProjection + 'N/A');
+                        else
+                            $.ajax({
+                                type: 'GET',
+                                url: '/dailyProjections/' + playerData.fangraphsId + $(location).attr('search') + '&type=' + (viewType == 'pitcher' ? 'P' : 'OF'),
+                                dataType: 'json',
+                                success: function (json) {
+                                    $('span#fangraphsProjection').text(fangraphsProjection + json.data);
+                                }
+                            });
                     } else {
                         var attributeProperCase = attribute.charAt(0).toUpperCase() + attribute.substring(1);
                         $('#player' + attributeProperCase).text((attributeProperCase == 'Name' ? '' : attributeProperCase + ': ') + playerData[attribute]);
@@ -145,12 +149,41 @@ let playerView = function (anchor, playerId, viewType) {
         });
 
         // Key Stats
+        var opposingStarter = {
+            id: '',
+            name: ''
+        }
+        var playerRow = $(anchor).closest('tr');
+        var playerTeam = playerRow.find('td:eq(1)').text();
+        var playerGameTime = playerRow.find('td:eq(2)').text();
+        $('table#todaysGames').find('tbody').find('tr').each(function () {
+            var matchup = $(this).find('td:eq(1)').text().split('@');
+            var awayTeam = matchup[0].trim();
+            var homeTeam = matchup[1].trim();
+            if (playerGameTime == $(this).find('td:eq(0)').text()) {
+                var opposingStarterCell;
+                if (awayTeam == playerTeam)
+                    opposingStarterCell = $(this).find('td:eq(3)');
+                else if (homeTeam == playerTeam)
+                    opposingStarterCell = $(this).find('td:eq(2)');
+                if (opposingStarterCell) {
+                    opposingStarter.id = opposingStarterCell.find('a').attr('onclick').split(',')[1].trim();
+                    opposingStarter.name = opposingStarterCell.text();
+                    return;
+                }
+            }
+        });
         $.ajax({
             type: 'GET',
-            url: '/summaryStats/' + viewType + '/' + playerId + $(location).attr('search'),
+            url: '/summaryStats/' + viewType + '/' + playerId + $(location).attr('search') + '&pitcher=' + opposingStarter.id,
             dataType: 'json',
             success: function (json) {
-
+                var vsStarter = json.data.vsStarter;
+                var vsStarterString = '';
+                if (vsStarter && vsStarter.PA) {
+                    vsStarterString = 'xH / PA vs ' + opposingStarter.name + ': ' + (vsStarter.xH / vsStarter.PA).toFixed(3) + ' (' + vsStarter.xH + ' - ' + vsStarter.PA + ')';
+                }
+                $('span#batterVsStarter').text(vsStarterString);
             }
         });
 

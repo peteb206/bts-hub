@@ -344,6 +344,8 @@ class BTSHubMongoDB:
                 status = f'{game["linescore"]["inningHalf"][:3]} {game["linescore"]["currentInningOrdinal"]}'
             if ('score' in game['teams']['away'].keys()) & (status not in ['Warmup', 'Pre-Game', 'Scheduled']):
                 status += f' ({game["teams"]["away"]["score"]} - {game["teams"]["home"]["score"]})'
+            else:
+                status = f'Starts @ {(datetime.strptime(game["gameDate"], "%Y-%m-%dT%H:%M:%SZ") - timedelta(hours=5)).strftime("%H:%M")}'
             return status
 
         # Calculated
@@ -360,8 +362,7 @@ class BTSHubMongoDB:
                                 lineups_dict[game['gamePk']][game['teams'][side]['team']['id']][player['id']] = i
                                 i += 1
                 games_list.append({
-                    'time': (datetime.strptime(game['gameDate'], '%Y-%m-%dT%H:%M:%SZ') - timedelta(hours=5)).strftime('%H:%M'),
-                    'matchup': f'{game["teams"]["away"]["team"]["abbreviation"]} @ {game["teams"]["home"]["team"]["abbreviation"]}',
+                    'matchup': f'<span game-id="{game["gamePk"]}">{game["teams"]["away"]["team"]["abbreviation"]} @ {game["teams"]["home"]["team"]["abbreviation"]}</span>',
                     'awayStarter': f'<a href="javascript:void(0)" class="float-left" onclick="playerView(this, {game["teams"]["away"]["probablePitcher"]["id"]}, \'pitcher\')"><i class="fas fa-arrow-circle-right rowSelectorIcon"></i></a><span class="playerText">{game["teams"]["away"]["probablePitcher"]["fullName"]}</span>' if 'probablePitcher' in game['teams']['away'].keys() else '',
                     'homeStarter': f'<a href="javascript:void(0)" class="float-left" onclick="playerView(this, {game["teams"]["home"]["probablePitcher"]["id"]}, \'pitcher\')"><i class="fas fa-arrow-circle-right rowSelectorIcon"></i></a><span class="playerText">{game["teams"]["home"]["probablePitcher"]["fullName"]}</span>' if 'probablePitcher' in game['teams']['home'].keys() else '',
                     'status': get_status(game),

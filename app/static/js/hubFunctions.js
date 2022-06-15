@@ -112,7 +112,8 @@ let gameLogsColumns = function (playerType) {
 }
 
 let playerView = function (anchor, playerId, viewType) {
-    if ($(anchor).find('i.fa-arrow-circle-right').length) {
+    anchor = $(anchor);
+    if (anchor.find('i.fa-arrow-circle-right').length) {
         $('table#eligibleBatters').attr('current-player', playerId);
         $('i.fa-arrow-circle-down').removeClass('fa-arrow-circle-down')
             .addClass('fa-arrow-circle-right');
@@ -153,20 +154,22 @@ let playerView = function (anchor, playerId, viewType) {
             id: '',
             name: ''
         }
-        var playerRow = $(anchor).closest('tr');
+        var playerRow = anchor.closest('tr');
         var playerTeam = playerRow.find('td:eq(1)').text();
-        var playerGameTime = playerRow.find('td:eq(2)').text();
+        var playerGame = anchor.find('i').attr('game-id');
         $('table#todaysGames').find('tbody').find('tr').each(function () {
-            var matchup = $(this).find('td:eq(1)').text().split('@');
-            var awayTeam = matchup[0].trim();
-            var homeTeam = matchup[1].trim();
-            if (playerGameTime == $(this).find('td:eq(0)').text()) {
+            let matchupRow = $(this);
+            let matchup = matchupRow.find('td:eq(0)').text().split('@');
+            let matchupGame = matchupRow.find('span').attr('game-id');
+            if (playerGame == matchupGame) {
+                var awayTeam = matchup[0].trim();
+                var homeTeam = matchup[1].trim();
                 var opposingStarterCell;
                 if (awayTeam == playerTeam)
-                    opposingStarterCell = $(this).find('td:eq(3)');
+                    opposingStarterCell = matchupRow.find('td:eq(2)');
                 else if (homeTeam == playerTeam)
-                    opposingStarterCell = $(this).find('td:eq(2)');
-                if (opposingStarterCell) {
+                    opposingStarterCell = matchupRow.find('td:eq(1)');
+                if (opposingStarterCell && opposingStarterCell.text() != '') {
                     opposingStarter.id = opposingStarterCell.find('a').attr('onclick').split(',')[1].trim();
                     opposingStarter.name = opposingStarterCell.text();
                     return;
@@ -340,7 +343,7 @@ let createBarGraph = function (targetDiv, data, group, stats, title) {
     }
 
     var plotConfig = {
-        displayModeBar: false
+        staticPlot: true
     };
 
     Plotly.newPlot(targetDiv, plotData, plotLayout, plotConfig);

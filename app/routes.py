@@ -1,5 +1,4 @@
 import os
-from urllib import response
 from app import app, db
 from flask import jsonify, render_template, request, redirect, send_from_directory
 from datetime import datetime, timedelta
@@ -192,6 +191,7 @@ def player_stats(stat_type, player_id):
                 ]))
                 if len(batter_vs_pitcher):
                     summary_stats['vsStarter'] = batter_vs_pitcher[0]
+                    summary_stats['vsStarter']['xH'] = round(summary_stats['vsStarter']['xH'], 3)
     return jsonify({'data': summary_stats})
 
 

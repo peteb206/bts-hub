@@ -280,7 +280,7 @@ def display_html(db, path, filters={}):
         eligible_batters_df = pd.merge(eligible_batters_df, batter_per_pa_vs_bullpen_df, how='left', on=['batter'], suffixes=['', ' vs Bullpen'])
         eligible_batters_df = pd.merge(eligible_batters_df, batter_per_pa_vs_rhp_lhp_df, how='left', on=['batter'])
         eligible_batters_df['lineup'] = eligible_batters_df.apply(lambda row: get_lineup_slot(todays_games['lineups'], row['batterLineupSlot'], row['gamePk'], row['teamId'], row['batter']), axis = 1)
-        eligible_batters_df['batter'] = eligible_batters_df.apply(lambda row: f'<a href="javascript:void(0)" class="float-left" onclick="playerView(this, {row["batter"]}, \'batter\')"><i class="fas fa-arrow-circle-right rowSelectorIcon" player-id="{row["batter"]}"></i></a><span class="playerText">{row["name"]}</span>', axis=1)
+        eligible_batters_df['batter'] = eligible_batters_df.apply(lambda row: f'<a href="javascript:void(0)" class="float-left" onclick="playerView(this, {row["batter"]}, \'batter\')"><i class="fas fa-arrow-circle-right rowSelectorIcon" player-id="{row["batter"]}" game-id="{row["gamePk"]}"></i></a><span class="playerText">{row["name"]}</span>', axis=1)
 
         html =  f'''
             <div id="mainDashboard">

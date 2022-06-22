@@ -130,15 +130,20 @@ let playerView = function (anchor, playerId, viewType) {
                     if (attribute == 'fangraphsId') {
                         // Daily Projection
                         var fangraphsProjection = 'SaberSim: ';
+                        var fangraphsProjectionDiv = $('div#fangraphsProjection').empty();
                         if (playerData[attribute] == '')
-                            $('span#fangraphsProjection').text(fangraphsProjection + 'N/A');
+                            fangraphsProjectionDiv.append('<span>' + fangraphsProjection + 'N/A</span>');
                         else
                             $.ajax({
                                 type: 'GET',
                                 url: '/dailyProjections/' + playerData.fangraphsId + $(location).attr('search') + '&type=' + (viewType == 'pitcher' ? 'P' : 'OF'),
                                 dataType: 'json',
                                 success: function (json) {
-                                    $('span#fangraphsProjection').text(fangraphsProjection + json.data);
+                                    let fangraphsLink = $('<a></a>')
+                                        .attr('href', 'https://www.fangraphs.com/statss.aspx?playerid=' + playerData.fangraphsId)
+                                        .attr('target', '_blank')
+                                        .text(fangraphsProjection + json.data);
+                                    fangraphsProjectionDiv.append(fangraphsLink);
                                 }
                             });
                     } else {

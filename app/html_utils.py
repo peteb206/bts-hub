@@ -96,7 +96,7 @@ def filters_html(path, filter_types, filter_values):
                         <a class="nav-link" href="#" onclick="showSummary(this)">Split Summary</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="https://www.mlb.com/play/games" target="_blank">Make Pick</a>
+                        <a class="nav-link" href="https://www.mlb.com/apps/beat-the-streak/game/" target="_blank">Make Pick</a>
                     </li>
                 </ul>
             </div>
@@ -301,9 +301,7 @@ def display_html(db, path, filters={}):
                                     <div class="col">
                                         <span id="playerTeam"></span>
                                     </div>
-                                    <div class="col-8">
-                                        <span id="fangraphsProjection"></span>
-                                    </div>
+                                    <div id="fangraphsProjection" class="col-8"></div>
                                 </div>
                                 <div class="row" style="padding-top: 5px;">
                                     <div class="col">
